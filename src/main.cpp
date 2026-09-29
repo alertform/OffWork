@@ -1,6 +1,7 @@
 #include "calculator.h"
 #include "resource.h"
 
+#include <windows.h>
 #include <commctrl.h>
 #include <dwmapi.h>
 #include <shellapi.h>
@@ -529,13 +530,13 @@ void CreateEditors(HWND parent, HINSTANCE instance) {
     const DWORD style = WS_CHILD | WS_TABSTOP | ES_CENTER | ES_AUTOHSCROLL;
     g.startEdit = CreateWindowExW(
         0, L"EDIT", L"09:00", style, 0, 0, 0, 0,
-        parent, reinterpret_cast<HMENU>(kStartEditId), instance, nullptr);
+        parent, reinterpret_cast<HMENU>(static_cast<INT_PTR>(kStartEditId)), instance, nullptr);
     g.endEdit = CreateWindowExW(
         0, L"EDIT", L"18:00", style, 0, 0, 0, 0,
-        parent, reinterpret_cast<HMENU>(kEndEditId), instance, nullptr);
+        parent, reinterpret_cast<HMENU>(static_cast<INT_PTR>(kEndEditId)), instance, nullptr);
     g.salaryEdit = CreateWindowExW(
         0, L"EDIT", L"500", style, 0, 0, 0, 0,
-        parent, reinterpret_cast<HMENU>(kSalaryEditId), instance, nullptr);
+        parent, reinterpret_cast<HMENU>(static_cast<INT_PTR>(kSalaryEditId)), instance, nullptr);
 
     HWND edits[] = {g.startEdit, g.endEdit, g.salaryEdit};
     for (HWND edit : edits) {
