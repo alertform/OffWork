@@ -283,11 +283,16 @@ void SetExpanded(bool expanded) {
         ArrangeEditors();
         ShowEditors(true);
     } else {
-        // Hide child HWNDs first, then resize exactly once. This avoids the
-        // two-layout collapse jitter seen in the previous WinUI Expander.
+        // Hide child HWNDs and synchronously paint the collapsed state while
+        // the backing surface is still full-sized. The following single resize
+        // then crops an already-correct frame instead of briefly exposing the
+        // expanded panel from the compositor's previous frame.
         ShowEditors(false);
         g.expanded = false;
         g.validationError = false;
+        RedrawWindow(
+            g.window, nullptr, nullptr,
+            RDW_INVALIDATE | RDW_UPDATENOW | RDW_ALLCHILDREN);
         ResizeWindow(kCollapsedHeight);
     }
 
