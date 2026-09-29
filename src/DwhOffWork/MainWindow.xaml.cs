@@ -55,7 +55,6 @@ public sealed partial class MainWindow : Window
         _appWindow.TitleBar.ButtonBackgroundColor = Colors.Transparent;
         _appWindow.TitleBar.ButtonInactiveBackgroundColor = Colors.Transparent;
         UpdateTitleBarInsets();
-        _appWindow.TitleBar.LayoutMetricsChanged += (_, _) => UpdateTitleBarInsets();
 
         if (_appWindow.Presenter is OverlappedPresenter presenter)
         {
