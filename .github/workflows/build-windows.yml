@@ -11,7 +11,7 @@ jobs:
   test-and-build:
     runs-on: windows-latest
     permissions:
-      contents: read
+      contents: write
 
     steps:
       - uses: actions/checkout@v4
@@ -47,3 +47,26 @@ jobs:
           name: OffWork-win-x64
           path: artifacts/win-x64/OffWork.exe
           if-no-files-found: error
+
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          @"
+          一只陪你等下班的小猫悬浮窗。
+
+          - 实时显示下班倒计时、工作进度和今日已赚金额
+          - 支持跨午夜班次、设置持久化和窗口置顶
+          - 自定义小猫标题栏，支持 Windows 深色/浅色主题
+          - Windows x64 单文件版本，无需安装
+
+          首次启动可能需要几秒钟解压自带运行组件。该版本尚未进行代码签名，Windows 可能显示安全提示。
+          "@ | Set-Content release-notes.md -Encoding utf8
+
+          gh release create $env:GITHUB_REF_NAME `
+            "artifacts/win-x64/OffWork.exe#OffWork.exe" `
+            --repo $env:GITHUB_REPOSITORY `
+            --title "OffWork $env:GITHUB_REF_NAME" `
+            --notes-file release-notes.md
