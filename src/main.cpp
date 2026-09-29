@@ -27,10 +27,10 @@ constexpr int kEndEditId = 1002;
 constexpr int kSalaryEditId = 1003;
 constexpr int kWindowWidth = 360;
 constexpr int kCollapsedHeight = 330;
-constexpr int kExpandedHeight = 690;
+constexpr int kExpandedHeight = 660;
 constexpr int kMinScalePercent = 75;
 constexpr int kMaxScalePercent = 150;
-constexpr BYTE kTranslucentAlpha = 217;
+constexpr int kMinOpacityPercent = 25;
 
 constexpr COLORREF kBackground = RGB(4, 17, 35);
 constexpr COLORREF kTitleBackground = RGB(18, 29, 44);
@@ -51,7 +51,7 @@ struct Settings {
     int endMinutes = 18 * 60;
     double dailySalary = 500.0;
     int uiScalePercent = 100;
-    bool translucent = false;
+    int opacityPercent = 100;
 };
 
 enum class HotElement {
@@ -79,6 +79,7 @@ struct AppState {
     UINT dpi = 96;
     bool pinned = true;
     bool expanded = false;
+    bool adjustingOpacity = false;
     bool validationError = false;
     HotElement hot = HotElement::None;
     Settings settings;
@@ -222,9 +223,11 @@ Settings LoadSettings() {
         static_cast<int>(GetPrivateProfileIntW(
             L"window", L"scalePercent", settings.uiScalePercent, g.settingsPath.c_str())),
         kMinScalePercent, kMaxScalePercent);
-    settings.translucent = GetPrivateProfileIntW(
-        L"window", L"translucent", settings.translucent ? 1 : 0,
-        g.settingsPath.c_str()) != 0;
+    settings.opacityPercent = std::clamp(
+        static_cast<int>(GetPrivateProfileIntW(
+            L"window", L"opacityPercent", settings.opacityPercent,
+            g.settingsPath.c_str())),
+        kMinOpacityPercent, 100);
 
     wchar_t salary[64] = {};
     GetPrivateProfileStringW(
@@ -255,9 +258,9 @@ void SaveSettings() {
     WritePrivateProfileStringW(L"work", L"dailySalary", value, g.settingsPath.c_str());
     swprintf_s(value, L"%d", g.settings.uiScalePercent);
     WritePrivateProfileStringW(L"window", L"scalePercent", value, g.settingsPath.c_str());
+    swprintf_s(value, L"%d", g.settings.opacityPercent);
     WritePrivateProfileStringW(
-        L"window", L"translucent", g.settings.translucent ? L"1" : L"0",
-        g.settingsPath.c_str());
+        L"window", L"opacityPercent", value, g.settingsPath.c_str());
 }
 
 std::wstring FormatTime(int minutes) {
@@ -307,7 +310,7 @@ void ShowEditors(bool visible) {
 void ResizeWindow(int logicalHeight) {
     SetWindowPos(
         g.window, nullptr, 0, 0, Scale(kWindowWidth), Scale(logicalHeight),
-        SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
+        SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOCOPYBITS);
 }
 
 void SetExpanded(bool expanded) {
@@ -392,9 +395,24 @@ void TogglePinned() {
     InvalidateRect(g.window, nullptr, FALSE);
 }
 
-void ApplyTransparency() {
-    SetLayeredWindowAttributes(
-        g.window, 0, g.settings.translucent ? kTranslucentAlpha : 255, LWA_ALPHA);
+void ApplyOpacity() {
+    LONG_PTR extendedStyle = GetWindowLongPtrW(g.window, GWL_EXSTYLE);
+    if (g.settings.opacityPercent == 100) {
+        if ((extendedStyle & WS_EX_LAYERED) != 0) {
+            SetLayeredWindowAttributes(g.window, 0, 255, LWA_ALPHA);
+            SetWindowLongPtrW(g.window, GWL_EXSTYLE, extendedStyle & ~WS_EX_LAYERED);
+        }
+    } else {
+        if ((extendedStyle & WS_EX_LAYERED) == 0) {
+            extendedStyle |= WS_EX_LAYERED;
+            SetWindowLongPtrW(g.window, GWL_EXSTYLE, extendedStyle);
+        }
+        const BYTE alpha = static_cast<BYTE>(MulDiv(g.settings.opacityPercent, 255, 100));
+        SetLayeredWindowAttributes(g.window, 0, alpha, LWA_ALPHA);
+    }
+    RedrawWindow(
+        g.window, nullptr, nullptr,
+        RDW_INVALIDATE | RDW_UPDATENOW | RDW_ALLCHILDREN | RDW_FRAME);
 }
 
 RECT PinRect() {
@@ -410,11 +428,32 @@ RECT SettingsRect() {
 }
 
 RECT TransparencyRect() {
-    return ScaledRect(268, 530, 323, 558);
+    return ScaledRect(37, 536, 323, 562);
+}
+
+RECT OpacityTrackRect() {
+    return ScaledRect(50, 546, 310, 552);
 }
 
 RECT SaveRect() {
-    return ScaledRect(37, 584, 323, 624);
+    return ScaledRect(37, 570, 323, 606);
+}
+
+int OpacityFromPoint(POINT point) {
+    const RECT track = OpacityTrackRect();
+    const int x = std::clamp(point.x, track.left, track.right);
+    return kMinOpacityPercent + MulDiv(
+        x - track.left, 100 - kMinOpacityPercent, track.right - track.left);
+}
+
+void UpdateOpacityFromPoint(POINT point) {
+    const int opacity = OpacityFromPoint(point);
+    if (opacity == g.settings.opacityPercent) {
+        return;
+    }
+    g.settings.opacityPercent = opacity;
+    ApplyOpacity();
+    InvalidateRect(g.window, nullptr, FALSE);
 }
 
 HotElement HitElement(POINT point) {
@@ -466,19 +505,28 @@ void DrawChevron(HDC dc, bool expanded) {
     }
 }
 
-void DrawTransparencyToggle(HDC dc) {
-    const RECT track = TransparencyRect();
-    FillRounded(
-        dc, track, 14,
-        g.settings.translucent
-            ? (g.hot == HotElement::Transparency ? kAccentHover : kAccent)
-            : (g.hot == HotElement::Transparency ? kButtonHover : kButtonBackground));
-    const RECT thumb = g.settings.translucent
-        ? ScaledRect(297, 534, 319, 556)
-        : ScaledRect(272, 534, 294, 556);
+void DrawOpacitySlider(HDC dc) {
+    const RECT track = OpacityTrackRect();
+    FillRounded(dc, track, 3, kProgressTrack);
+    const int thumbCenter = track.left + MulDiv(
+        g.settings.opacityPercent - kMinOpacityPercent,
+        track.right - track.left, 100 - kMinOpacityPercent);
+    RECT filledTrack = track;
+    filledTrack.right = thumbCenter;
+    if (filledTrack.right > filledTrack.left) {
+        FillRounded(dc, filledTrack, 3, kAccent);
+    }
+    const int thumbRadius = Scale(8);
+    const int thumbCenterY = (track.top + track.bottom) / 2;
+    const RECT thumb = {
+        thumbCenter - thumbRadius,
+        thumbCenterY - thumbRadius,
+        thumbCenter + thumbRadius,
+        thumbCenterY + thumbRadius};
     FillEllipse(
         dc, thumb,
-        g.settings.translucent ? RGB(4, 34, 51) : kTextSecondary);
+        g.hot == HotElement::Transparency || g.adjustingOpacity
+            ? kAccentHover : kTextPrimary);
 }
 
 void DrawResizeGrip(HDC dc) {
@@ -573,7 +621,7 @@ void PaintWindow(HDC target, const RECT& client) {
     DrawChevron(dc, g.expanded);
 
     if (g.expanded) {
-        FillRounded(dc, ScaledRect(20, 306, 340, 672), 6, kPanelBackground);
+        FillRounded(dc, ScaledRect(20, 306, 340, 642), 6, kPanelBackground);
         DrawTextInRect(dc, L"上班时间", ScaledRect(37, 315, 220, 339), g.labelFont, kTextPrimary);
         DrawTextInRect(dc, L"下班时间", ScaledRect(37, 382, 220, 406), g.labelFont, kTextPrimary);
         DrawTextInRect(dc, L"日薪（元）", ScaledRect(37, 449, 220, 473), g.labelFont, kTextPrimary);
@@ -582,10 +630,12 @@ void PaintWindow(HDC target, const RECT& client) {
         FillRounded(dc, ScaledRect(37, 411, 323, 447), 5, kInputBackground);
         FillRounded(dc, ScaledRect(37, 478, 323, 514), 5, kInputBackground);
 
+        wchar_t opacityLabel[32] = {};
+        swprintf_s(opacityLabel, L"不透明度 %d%%", g.settings.opacityPercent);
         DrawTextInRect(
-            dc, L"半透明（85%）", ScaledRect(37, 530, 250, 558),
+            dc, opacityLabel, ScaledRect(37, 518, 323, 538),
             g.labelFont, kTextPrimary);
-        DrawTransparencyToggle(dc);
+        DrawOpacitySlider(dc);
 
         const COLORREF saveColor = g.hot == HotElement::Save ? kAccentHover : kAccent;
         FillRounded(dc, SaveRect(), 6, saveColor);
@@ -595,11 +645,11 @@ void PaintWindow(HDC target, const RECT& client) {
 
         if (g.validationError) {
             DrawTextInRect(
-                dc, L"请输入 HH:MM 时间和有效日薪", ScaledRect(37, 636, 323, 657),
+                dc, L"请输入 HH:MM 时间和有效日薪", ScaledRect(37, 614, 323, 635),
                 g.tinyFont, kDanger, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
         } else {
             DrawTextInRect(
-                dc, L"设置和窗口大小保存在本机", ScaledRect(37, 636, 323, 657),
+                dc, L"设置和窗口大小保存在本机", ScaledRect(37, 614, 323, 635),
                 g.tinyFont, kTextMuted, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
         }
     }
@@ -652,7 +702,9 @@ void SetUiScale(int percent) {
     CreateFonts();
     ArrangeEditors();
     if (g.window != nullptr) {
-        InvalidateRect(g.window, nullptr, FALSE);
+        RedrawWindow(
+            g.window, nullptr, nullptr,
+            RDW_INVALIDATE | RDW_UPDATENOW | RDW_ALLCHILDREN);
     }
 }
 
@@ -690,7 +742,6 @@ void ConstrainSizingRect(RECT& rect, WPARAM edge) {
     } else {
         rect.bottom = rect.top + height;
     }
-    SetUiScale(percent);
 }
 
 LRESULT ResizeHitTest(HWND window, POINT point) {
@@ -726,7 +777,7 @@ LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
             CreateFonts();
             PopulateEditors();
             ApplyWindowAppearance(window);
-            ApplyTransparency();
+            ApplyOpacity();
             SetTimer(window, kClockTimer, 1000, nullptr);
             return 0;
         }
@@ -765,6 +816,10 @@ LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
         }
         case WM_MOUSEMOVE: {
             POINT point = {GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
+            if (g.adjustingOpacity) {
+                UpdateOpacityFromPoint(point);
+                return 0;
+            }
             const HotElement hot = HitElement(point);
             if (hot != g.hot) {
                 g.hot = hot;
@@ -778,8 +833,26 @@ LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
             g.hot = HotElement::None;
             InvalidateRect(window, nullptr, FALSE);
             return 0;
+        case WM_LBUTTONDOWN: {
+            POINT point = {GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
+            if (HitElement(point) == HotElement::Transparency) {
+                g.adjustingOpacity = true;
+                SetCapture(window);
+                UpdateOpacityFromPoint(point);
+                return 0;
+            }
+            break;
+        }
         case WM_LBUTTONUP: {
             POINT point = {GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
+            if (g.adjustingOpacity) {
+                UpdateOpacityFromPoint(point);
+                g.adjustingOpacity = false;
+                ReleaseCapture();
+                SaveSettings();
+                InvalidateRect(window, nullptr, FALSE);
+                return 0;
+            }
             switch (HitElement(point)) {
                 case HotElement::Pin:
                     TogglePinned();
@@ -791,8 +864,7 @@ LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
                     SetExpanded(!g.expanded);
                     break;
                 case HotElement::Transparency:
-                    g.settings.translucent = !g.settings.translucent;
-                    ApplyTransparency();
+                    UpdateOpacityFromPoint(point);
                     SaveSettings();
                     InvalidateRect(window, nullptr, FALSE);
                     break;
@@ -813,6 +885,11 @@ LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
             }
             return 0;
         }
+        case WM_CAPTURECHANGED:
+            g.adjustingOpacity = false;
+            SaveSettings();
+            InvalidateRect(window, nullptr, FALSE);
+            return 0;
         case WM_COMMAND:
             if (HIWORD(wParam) == EN_CHANGE && g.validationError) {
                 g.validationError = false;
@@ -832,6 +909,13 @@ LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
         case WM_SIZING:
             ConstrainSizingRect(*reinterpret_cast<RECT*>(lParam), wParam);
             return TRUE;
+        case WM_WINDOWPOSCHANGING: {
+            auto position = reinterpret_cast<WINDOWPOS*>(lParam);
+            if ((position->flags & SWP_NOSIZE) == 0) {
+                position->flags |= SWP_NOCOPYBITS;
+            }
+            return 0;
+        }
         case WM_SIZE:
             if (wParam != SIZE_MINIMIZED) {
                 const int baseWidth = ScaleForDpi(kWindowWidth);
@@ -942,7 +1026,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int showCommand) {
     const int margin = Scale(20);
 
     HWND window = CreateWindowExW(
-        WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_LAYERED,
+        WS_EX_TOPMOST | WS_EX_TOOLWINDOW,
         kWindowClass,
         kWindowTitle,
         WS_POPUP | WS_THICKFRAME | WS_CLIPCHILDREN,
