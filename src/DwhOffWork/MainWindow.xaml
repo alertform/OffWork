@@ -4,7 +4,10 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
-    <Grid Background="Transparent" Padding="20,14,20,18" RowSpacing="12">
+    <Grid Background="Transparent"
+          Padding="20,14,20,18"
+          RowSpacing="12"
+          Loaded="RootGrid_Loaded">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
@@ -82,24 +85,19 @@
         <Expander x:Name="SettingsExpander"
                   Grid.Row="3"
                   Header="设置"
-                  Expanded="SettingsExpander_Expanded"
+                  Expanding="SettingsExpander_Expanding"
                   Collapsed="SettingsExpander_Collapsed">
             <StackPanel Padding="0,10,0,0" Spacing="12">
-                <Grid ColumnSpacing="12">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="*" />
-                    </Grid.ColumnDefinitions>
-                    <TimePicker x:Name="StartTimePicker"
-                                Header="上班时间"
-                                ClockIdentifier="24HourClock"
-                                MinuteIncrement="5" />
-                    <TimePicker x:Name="EndTimePicker"
-                                Grid.Column="1"
-                                Header="下班时间"
-                                ClockIdentifier="24HourClock"
-                                MinuteIncrement="5" />
-                </Grid>
+                <TimePicker x:Name="StartTimePicker"
+                            Header="上班时间"
+                            ClockIdentifier="24HourClock"
+                            MinuteIncrement="5"
+                            HorizontalAlignment="Stretch" />
+                <TimePicker x:Name="EndTimePicker"
+                            Header="下班时间"
+                            ClockIdentifier="24HourClock"
+                            MinuteIncrement="5"
+                            HorizontalAlignment="Stretch" />
                 <NumberBox x:Name="DailySalaryBox"
                            Header="日薪（元）"
                            Minimum="0"
@@ -125,4 +123,3 @@
         </Expander>
     </Grid>
 </Window>
-

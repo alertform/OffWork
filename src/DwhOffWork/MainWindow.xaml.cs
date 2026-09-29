@@ -14,7 +14,7 @@ public sealed partial class MainWindow : Window
 {
     private const int WindowWidth = 360;
     private const int CollapsedHeight = 390;
-    private const int ExpandedHeight = 650;
+    private const int ExpandedHeight = 720;
 
     private static readonly CultureInfo ChineseCulture = CultureInfo.GetCultureInfo("zh-CN");
 
@@ -33,6 +33,7 @@ public sealed partial class MainWindow : Window
         var windowId = Win32Interop.GetWindowIdFromWindow(windowHandle);
         _appWindow = AppWindow.GetFromWindowId(windowId);
         ConfigureWindow();
+        Activated += (_, _) => ApplyPinState();
 
         _settings = AppSettings.Load();
         PopulateSettingsControls();
@@ -164,16 +165,28 @@ public sealed partial class MainWindow : Window
 
     private void PinButton_Click(object sender, RoutedEventArgs e)
     {
+        ApplyPinState();
+    }
+
+    private void RootGrid_Loaded(object sender, RoutedEventArgs e) =>
+        ApplyPinState();
+
+    private void ApplyPinState()
+    {
         if (_appWindow.Presenter is OverlappedPresenter presenter)
         {
             presenter.IsAlwaysOnTop = PinButton.IsChecked == true;
         }
     }
 
-    private void SettingsExpander_Expanded(object sender, RoutedEventArgs e) =>
+    private void SettingsExpander_Expanding(
+        Microsoft.UI.Xaml.Controls.Expander sender,
+        Microsoft.UI.Xaml.Controls.ExpanderExpandingEventArgs e) =>
         ResizeWindow(ExpandedHeight);
 
-    private void SettingsExpander_Collapsed(object sender, RoutedEventArgs e) =>
+    private void SettingsExpander_Collapsed(
+        Microsoft.UI.Xaml.Controls.Expander sender,
+        Microsoft.UI.Xaml.Controls.ExpanderCollapsedEventArgs e) =>
         ResizeWindow(CollapsedHeight);
 
     private void ResizeWindow(int height) =>
