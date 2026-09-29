@@ -219,8 +219,8 @@ Settings LoadSettings() {
     settings.endMinutes = GetPrivateProfileIntW(
         L"work", L"endMinutes", settings.endMinutes, g.settingsPath.c_str());
     settings.uiScalePercent = std::clamp(
-        GetPrivateProfileIntW(
-            L"window", L"scalePercent", settings.uiScalePercent, g.settingsPath.c_str()),
+        static_cast<int>(GetPrivateProfileIntW(
+            L"window", L"scalePercent", settings.uiScalePercent, g.settingsPath.c_str())),
         kMinScalePercent, kMaxScalePercent);
     settings.translucent = GetPrivateProfileIntW(
         L"window", L"translucent", settings.translucent ? 1 : 0,
