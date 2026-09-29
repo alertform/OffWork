@@ -1,5 +1,6 @@
 #include "app_edit.h"
 
+#include "app_tray.h"
 #include "app_view.h"
 #include "autostart.h"
 #include "calculator.h"
@@ -183,6 +184,9 @@ void ApplySave() {
     }
     g.settings = NormalizeSettings(parsed);
     SaveSettings(g.settingsPath, g.settings);
+    // A new schedule can put "now" after the end time; that is an edit, not a
+    // shift ending, so rebase the reminder instead of letting it fire.
+    ResetShiftReminder();
     SetExpanded(false);
 }
 

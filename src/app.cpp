@@ -149,6 +149,7 @@ LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
             RefreshAutostart();
             EnsureFonts(g.settings.uiScalePercent);
             InitializeTray();
+            ResetShiftReminder();
             BOOL darkMode = TRUE;
             DwmSetWindowAttribute(window, 20, &darkMode, sizeof(darkMode));
             SetTimer(window, kClockTimer, 1000, nullptr);
@@ -157,6 +158,9 @@ LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
 
         case WM_TIMER:
             if (wParam == kClockTimer) {
+                // The reminder is decided on every tick, hidden or not; only
+                // painting depends on visibility.
+                TickShiftReminder();
                 if (IsWindowVisible(window)) {
                     Present();
                 }

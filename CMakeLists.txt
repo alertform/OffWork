@@ -54,6 +54,13 @@ offwork_target_defaults(OffWorkAutostartTests)
 target_link_libraries(OffWorkAutostartTests PRIVATE advapi32)
 add_test(NAME autostart COMMAND OffWorkAutostartTests)
 
+add_executable(OffWorkReminderTests
+  tests/reminder_tests.cpp
+  src/reminder.cpp
+)
+offwork_target_defaults(OffWorkReminderTests)
+add_test(NAME reminder COMMAND OffWorkReminderTests)
+
 # -- application -------------------------------------------------------------
 
 if(WIN32)
@@ -70,6 +77,7 @@ if(WIN32)
     src/app_view.cpp
     src/autostart.cpp
     src/layered_surface.cpp
+    src/reminder.cpp
     src/render.cpp
     src/settings.cpp
     src/text_field.cpp

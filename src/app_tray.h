@@ -12,4 +12,9 @@ bool HandleTrayMessage(UINT message, WPARAM wParam, LPARAM lParam);
 bool HideWidgetToTray();
 void RemoveTray();
 
+// Off-work reminder. Reset establishes a baseline without notifying (startup,
+// after a schedule is saved); Tick runs every clock tick, visible or not.
+void ResetShiftReminder();
+void TickShiftReminder();
+
 }  // namespace offwork

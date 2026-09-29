@@ -5,6 +5,7 @@
 // is deliberately one place.
 
 #include "layered_surface.h"
+#include "reminder.h"
 #include "render.h"
 #include "settings.h"
 #include "text_field.h"
@@ -39,6 +40,7 @@ struct AppState {
     UINT dpi = 96;
     UINT taskbarCreatedMessage = 0;
     TrayIcon trayIcon;
+    ReminderState reminder;
 
     Settings settings;
     std::wstring settingsPath;

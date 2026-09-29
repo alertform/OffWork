@@ -26,6 +26,11 @@ public:
 
     TrayCommand ShowMenu(bool windowVisible, bool autostartEnabled, POINT anchor);
 
+    // Submits a notification banner through the notification-area icon.
+    // Returns whether the shell accepted it; whether it is *displayed* is up to
+    // Windows (Focus Assist / notification settings), not to us.
+    bool ShowBalloon(const wchar_t* title, const wchar_t* body);
+
 private:
     bool AddToShell();
 

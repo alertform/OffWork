@@ -41,6 +41,24 @@ bool TrayIcon::AddToShell() {
     return added_;
 }
 
+bool TrayIcon::ShowBalloon(const wchar_t* title, const wchar_t* body) {
+    if (owner_ == nullptr || !added_) {
+        return false;
+    }
+    NOTIFYICONDATAW data = {};
+    data.cbSize = sizeof(data);
+    data.hWnd = owner_;
+    data.uID = kTrayIconId;
+    data.uFlags = NIF_INFO;
+    wcscpy_s(data.szInfoTitle, title);
+    wcscpy_s(data.szInfo, body);
+    // The cat, not the generic "i": NIIF_USER takes the balloon icon from
+    // hBalloonIcon when NIIF_LARGE_ICON is set.
+    data.dwInfoFlags = NIIF_USER | NIIF_LARGE_ICON;
+    data.hBalloonIcon = icon_;
+    return Shell_NotifyIconW(NIM_MODIFY, &data) != FALSE;
+}
+
 void TrayIcon::Reinstall() {
     // Explorer recreates the notification area after a crash or restart and
     // broadcasts TaskbarCreated. Our bookkeeping still says "added", but the
