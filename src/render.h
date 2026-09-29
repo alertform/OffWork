@@ -34,6 +34,7 @@ struct RenderModel {
     bool expanded = false;
     bool pinned = true;
     bool autostartEnabled = false;
+    EndInputMode editEndInputMode = EndInputMode::EndTime;
     HotElement hot = HotElement::None;
     HICON icon = nullptr;
     const FontSet* fonts = nullptr;

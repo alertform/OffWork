@@ -1,6 +1,7 @@
 #pragma once
 
 #include <algorithm>
+#include <cmath>
 #include <stdexcept>
 
 namespace offwork {
@@ -17,6 +18,40 @@ struct WorkdaySnapshot {
     double earned;
     double progress;
 };
+
+inline int WorkDurationMinutes(int startMinutes, int endMinutes) {
+    constexpr int minutesPerDay = 24 * 60;
+    if (startMinutes < 0 || startMinutes >= minutesPerDay ||
+        endMinutes < 0 || endMinutes >= minutesPerDay ||
+        startMinutes == endMinutes) {
+        throw std::invalid_argument("work hours");
+    }
+    return endMinutes > startMinutes
+        ? endMinutes - startMinutes
+        : minutesPerDay - startMinutes + endMinutes;
+}
+
+inline int EndMinutesFromDuration(int startMinutes, int durationMinutes) {
+    constexpr int minutesPerDay = 24 * 60;
+    if (startMinutes < 0 || startMinutes >= minutesPerDay) {
+        throw std::invalid_argument("start time");
+    }
+    if (durationMinutes <= 0 || durationMinutes >= minutesPerDay) {
+        throw std::invalid_argument("work duration");
+    }
+    return (startMinutes + durationMinutes) % minutesPerDay;
+}
+
+inline int DurationMinutesFromHours(double hours) {
+    if (!std::isfinite(hours) || hours <= 0.0 || hours >= 24.0) {
+        throw std::invalid_argument("work duration hours");
+    }
+    const int minutes = static_cast<int>(std::round(hours * 60.0));
+    if (minutes <= 0 || minutes >= 24 * 60) {
+        throw std::invalid_argument("work duration hours");
+    }
+    return minutes;
+}
 
 inline WorkdaySnapshot CalculateWorkday(
     int nowSeconds,
@@ -73,4 +108,3 @@ inline WorkdaySnapshot CalculateWorkday(
 }
 
 }  // namespace offwork
-

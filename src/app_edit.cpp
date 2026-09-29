@@ -2,6 +2,7 @@
 
 #include "app_view.h"
 #include "autostart.h"
+#include "calculator.h"
 
 #include <cmath>
 #include <cstdio>
@@ -13,7 +14,10 @@ namespace offwork {
 // -- small helpers ----------------------------------------------------------
 
 FieldFilter FilterFor(int fieldIndex) {
-    return fieldIndex == 2 ? FieldFilter::Decimal : FieldFilter::Time;
+    return fieldIndex == 2 ||
+            (fieldIndex == 1 && g.editEndInputMode == EndInputMode::WorkDuration)
+        ? FieldFilter::Decimal
+        : FieldFilter::Time;
 }
 
 std::size_t MaxLengthFor(int fieldIndex) {
@@ -39,9 +43,46 @@ std::wstring FormatSalaryValue(double salary) {
     return value;
 }
 
+std::wstring FormatDurationHours(int durationMinutes) {
+    wchar_t text[32] = {};
+    swprintf_s(text, L"%.2f", static_cast<double>(durationMinutes) / 60.0);
+    std::wstring value(text);
+    while (value.size() > 1 && value.back() == L'0') {
+        value.pop_back();
+    }
+    if (!value.empty() && value.back() == L'.') {
+        value.pop_back();
+    }
+    return value;
+}
+
+bool ParseDurationText(const std::wstring& text, int& durationMinutes) {
+    if (text.empty()) {
+        return false;
+    }
+    wchar_t* end = nullptr;
+    const double hours = std::wcstod(text.c_str(), &end);
+    if (end == nullptr || *end != L'\0' || !std::isfinite(hours) ||
+        hours <= 0.0 || hours >= 24.0) {
+        return false;
+    }
+    try {
+        durationMinutes = DurationMinutesFromHours(hours);
+        return true;
+    } catch (const std::invalid_argument&) {
+        return false;
+    }
+}
+
 void PopulateFields() {
+    g.editEndInputMode = g.settings.endInputMode;
     g.fields[0] = MakeField(FormatTimeValue(g.settings.startMinutes));
-    g.fields[1] = MakeField(FormatTimeValue(g.settings.endMinutes));
+    g.fields[1] = MakeField(
+        g.editEndInputMode == EndInputMode::WorkDuration
+            ? FormatDurationHours(
+                  WorkDurationMinutes(
+                      g.settings.startMinutes, g.settings.endMinutes))
+            : FormatTimeValue(g.settings.endMinutes));
     g.fields[2] = MakeField(FormatSalaryValue(g.settings.dailySalary));
 }
 
@@ -59,9 +100,20 @@ bool ParseTimeText(const std::wstring& text, int& minutes) {
 
 bool ReadFieldSettings(Settings& settings) {
     settings = g.settings;
-    if (!ParseTimeText(g.fields[0].text, settings.startMinutes) ||
-        !ParseTimeText(g.fields[1].text, settings.endMinutes) ||
-        settings.startMinutes == settings.endMinutes) {
+    if (!ParseTimeText(g.fields[0].text, settings.startMinutes)) {
+        return false;
+    }
+
+    settings.endInputMode = g.editEndInputMode;
+    if (g.editEndInputMode == EndInputMode::WorkDuration) {
+        int durationMinutes = 0;
+        if (!ParseDurationText(g.fields[1].text, durationMinutes)) {
+            return false;
+        }
+        settings.endMinutes =
+            EndMinutesFromDuration(settings.startMinutes, durationMinutes);
+    } else if (!ParseTimeText(g.fields[1].text, settings.endMinutes) ||
+               settings.startMinutes == settings.endMinutes) {
         return false;
     }
 
@@ -153,6 +205,37 @@ void TogglePinned() {
     SetWindowPos(
         g.window, g.pinned ? HWND_TOPMOST : HWND_NOTOPMOST, 0, 0, 0, 0,
         SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+    Present();
+}
+
+void SetEndInputMode(EndInputMode mode) {
+    if (g.editEndInputMode == mode) {
+        return;
+    }
+
+    int startMinutes = g.settings.startMinutes;
+    ParseTimeText(g.fields[0].text, startMinutes);
+    int durationMinutes = WorkDurationMinutes(
+        g.settings.startMinutes, g.settings.endMinutes);
+
+    if (mode == EndInputMode::WorkDuration) {
+        int endMinutes = g.settings.endMinutes;
+        if (ParseTimeText(g.fields[1].text, endMinutes) &&
+            endMinutes != startMinutes) {
+            durationMinutes = WorkDurationMinutes(startMinutes, endMinutes);
+        }
+        g.fields[1] = MakeField(FormatDurationHours(durationMinutes));
+    } else {
+        ParseDurationText(g.fields[1].text, durationMinutes);
+        g.fields[1] = MakeField(FormatTimeValue(
+            EndMinutesFromDuration(startMinutes, durationMinutes)));
+    }
+
+    g.editEndInputMode = mode;
+    if (g.focusedField == 1) {
+        g.fields[1] = SelectAll(g.fields[1]);
+    }
+    ResetFooter();
     Present();
 }
 

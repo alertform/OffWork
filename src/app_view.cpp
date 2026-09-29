@@ -25,6 +25,7 @@ RenderModel BuildModel() {
     model.expanded = g.expanded;
     model.pinned = g.pinned;
     model.autostartEnabled = g.autostartEnabled;
+    model.editEndInputMode = g.editEndInputMode;
     model.hot = g.hot;
     model.icon = g.icon;
     model.fonts = &g.fonts;

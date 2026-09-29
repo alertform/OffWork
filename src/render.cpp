@@ -206,6 +206,22 @@ void DrawAutostartToggle(HDC dc, const RenderModel& model) {
     (void)radius;
 }
 
+void DrawEndModeButton(
+    HDC dc, const RenderModel& model, const LogicalRect& logicalRect,
+    HotElement element, bool selected, const wchar_t* label) {
+    const int scale = model.settings.uiScalePercent;
+    COLORREF background = selected ? kAccent : kButtonBackground;
+    if (model.hot == element) {
+        background = selected ? kAccentHover : kButtonHover;
+    }
+    const RECT rect = ToRect(logicalRect, scale, model.dpi);
+    FillRounded(dc, rect, ScaleValue(5, scale, model.dpi), background);
+    DrawTextInRect(
+        dc, label, rect, model.fonts->tiny,
+        selected ? kOnAccent : kTextSecondary,
+        DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+}
+
 void DrawField(HDC dc, const RenderModel& model, int fieldIndex) {
     const int scale = model.settings.uiScalePercent;
     const RECT box = ToRect(FieldBox(fieldIndex), scale, model.dpi);
@@ -260,7 +276,6 @@ void DrawField(HDC dc, const RenderModel& model, int fieldIndex) {
 }  // namespace
 
 // -- geometry ---------------------------------------------------------------
-
 int ScaleValue(int logical, int scalePercent, UINT dpi) {
     return MulDiv(ScaleForDpi(logical, dpi), scalePercent, 100);
 }
@@ -295,7 +310,6 @@ int ScaleFromWidth(int deviceWidth, UINT dpi) {
 }
 
 // -- fonts ------------------------------------------------------------------
-
 FontSet CreateFonts(int scalePercent, UINT dpi) {
     FontSet fonts;
     fonts.title = MakeFont(16, FW_SEMIBOLD, L"Microsoft YaHei UI", scalePercent, dpi);
@@ -383,6 +397,12 @@ HotElement HitTest(POINT point, const RenderModel& model) {
     }
     if (Contains(ToRect(kSalaryBox, scale, dpi), point)) {
         return HotElement::SalaryField;
+    }
+    if (Contains(ToRect(kEndTimeModeButton, scale, dpi), point)) {
+        return HotElement::EndTimeMode;
+    }
+    if (Contains(ToRect(kDurationModeButton, scale, dpi), point)) {
+        return HotElement::DurationMode;
     }
     if (Contains(ToRect(kOpacityHit, scale, dpi), point)) {
         return HotElement::Opacity;
@@ -538,8 +558,14 @@ void RenderFrame(HDC dc, const RenderModel& model) {
 
     DrawTextInRect(dc, L"上班时间", ToRect(kStartLabel, scale, dpi),
                    model.fonts->label, kTextPrimary);
-    DrawTextInRect(dc, L"下班时间", ToRect(kEndLabel, scale, dpi),
+    DrawTextInRect(dc, L"结束方式", ToRect(kEndModeLabel, scale, dpi),
                    model.fonts->label, kTextPrimary);
+    DrawEndModeButton(
+        dc, model, kEndTimeModeButton, HotElement::EndTimeMode,
+        model.editEndInputMode == EndInputMode::EndTime, L"下班时间");
+    DrawEndModeButton(
+        dc, model, kDurationModeButton, HotElement::DurationMode,
+        model.editEndInputMode == EndInputMode::WorkDuration, L"时长(小时)");
     DrawTextInRect(dc, L"日薪（元）", ToRect(kSalaryLabel, scale, dpi),
                    model.fonts->label, kTextPrimary);
 

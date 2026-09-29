@@ -12,7 +12,7 @@
   #define SourceExe "..\build\Release\OffWork.exe"
 #endif
 #ifndef AppVersion
-  #define AppVersion "0.2.0"
+  #define AppVersion "0.3.0"
 #endif
 
 #define AppName "OffWork"

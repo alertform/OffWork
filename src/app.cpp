@@ -2,6 +2,7 @@
 
 #include "app_edit.h"
 #include "app_state.h"
+#include "app_tray.h"
 #include "app_view.h"
 #include "autostart.h"
 #include "render.h"
@@ -111,8 +112,6 @@ void UpdateResize(POINT cursor) {
         percent = heightPercent;
     }
     percent = std::clamp(percent, kMinScalePercent, kMaxScalePercent);
-
-
     const SIZE size = WindowSizeFor(percent, g.dpi, g.expanded);
     POINT topLeft = {
         ResizesFromLeft(g.resizeHit) ? g.resizeAnchor.x - size.cx : g.resizeAnchor.x,
@@ -134,8 +133,11 @@ void EndResize() {
 }
 
 // -- window proc ------------------------------------------------------------
-
 LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lParam) {
+    if (HandleTrayMessage(message, wParam, lParam)) {
+        return 0;
+    }
+
     switch (message) {
         case WM_CREATE: {
             g.window = window;
@@ -146,6 +148,7 @@ LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
             PopulateFields();
             RefreshAutostart();
             EnsureFonts(g.settings.uiScalePercent);
+            InitializeTray();
             BOOL darkMode = TRUE;
             DwmSetWindowAttribute(window, 20, &darkMode, sizeof(darkMode));
             SetTimer(window, kClockTimer, 1000, nullptr);
@@ -154,7 +157,9 @@ LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
 
         case WM_TIMER:
             if (wParam == kClockTimer) {
-                Present();
+                if (IsWindowVisible(window)) {
+                    Present();
+                }
             } else if (wParam == kCaretTimer) {
                 g.caretVisible = !g.caretVisible;
                 Present();
@@ -400,6 +405,12 @@ LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
                 case HotElement::Autostart:
                     ToggleAutostart();
                     break;
+                case HotElement::EndTimeMode:
+                    SetEndInputMode(EndInputMode::EndTime);
+                    break;
+                case HotElement::DurationMode:
+                    SetEndInputMode(EndInputMode::WorkDuration);
+                    break;
                 case HotElement::Save:
                     ApplySave();
                     break;
@@ -485,12 +496,26 @@ LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
         }
 
         case WM_CLOSE:
-            DestroyWindow(window);
+            if (!HideWidgetToTray()) {
+                // Never leave an inaccessible hidden process behind if the
+                // notification icon could not be registered.
+                DestroyWindow(window);
+            }
+            return 0;
+
+        case WM_QUERYENDSESSION:
+            return TRUE;
+
+        case WM_ENDSESSION:
+            if (wParam != 0) {
+                DestroyWindow(window);
+            }
             return 0;
 
         case WM_DESTROY:
             KillTimer(window, kClockTimer);
             KillTimer(window, kCaretTimer);
+            RemoveTray();
             DestroyFonts(g.fonts);
             if (g.icon != nullptr) {
                 DestroyIcon(g.icon);

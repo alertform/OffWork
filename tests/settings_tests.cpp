@@ -4,11 +4,13 @@
 #include "theme.h"
 
 #include <cmath>
+#include <filesystem>
 #include <iostream>
 
 namespace {
 
 using offwork::NormalizeSettings;
+using offwork::EndInputMode;
 using offwork::Settings;
 
 Settings WithScale(int percent) {
@@ -88,6 +90,37 @@ void NormalizeDoesNotTouchItsInput() {
     CHECK(copy.uiScalePercent == offwork::kMaxScalePercent);
 }
 
+void InvalidEndInputModeFallsBackWithoutChangingValidModes() {
+    Settings invalid;
+    invalid.endInputMode = static_cast<EndInputMode>(99);
+    CHECK(NormalizeSettings(invalid).endInputMode == EndInputMode::EndTime);
+
+    Settings duration;
+    duration.endInputMode = EndInputMode::WorkDuration;
+    CHECK(NormalizeSettings(duration).endInputMode == EndInputMode::WorkDuration);
+}
+
+void EndInputModeRoundTripsThroughTheIniFile() {
+    const std::filesystem::path path =
+        std::filesystem::temp_directory_path() /
+        L"offwork-settings-mode-test.ini";
+    std::error_code error;
+    std::filesystem::remove(path, error);
+
+    Settings duration;
+    duration.startMinutes = 9 * 60;
+    duration.endMinutes = 17 * 60 + 30;
+    duration.endInputMode = EndInputMode::WorkDuration;
+    offwork::SaveSettings(path.wstring(), duration);
+
+    const Settings loaded = offwork::LoadSettings(path.wstring());
+    CHECK(loaded.startMinutes == duration.startMinutes);
+    CHECK(loaded.endMinutes == duration.endMinutes);
+    CHECK(loaded.endInputMode == EndInputMode::WorkDuration);
+
+    std::filesystem::remove(path, error);
+}
+
 }  // namespace
 
 int main() {
@@ -97,6 +130,8 @@ int main() {
     AValidOvernightShiftIsLeftAlone();
     SalaryIsClampedAndNonFiniteValuesAreRejected();
     NormalizeDoesNotTouchItsInput();
+    InvalidEndInputModeFallsBackWithoutChangingValidModes();
+    EndInputModeRoundTripsThroughTheIniFile();
 
     std::cout << "All OffWork settings tests passed.\n";
     return 0;

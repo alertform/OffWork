@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.24)
 
-project(OffWork VERSION 0.2.0 LANGUAGES CXX)
+project(OffWork VERSION 0.3.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -66,12 +66,14 @@ if(WIN32)
     src/main.cpp
     src/app.cpp
     src/app_edit.cpp
+    src/app_tray.cpp
     src/app_view.cpp
     src/autostart.cpp
     src/layered_surface.cpp
     src/render.cpp
     src/settings.cpp
     src/text_field.cpp
+    src/tray_icon.cpp
     resources/offwork.rc
   )
   offwork_target_defaults(OffWork)

@@ -7,12 +7,18 @@
 
 namespace offwork {
 
+enum class EndInputMode {
+    EndTime,
+    WorkDuration,
+};
+
 struct Settings {
     int startMinutes = 9 * 60;
     int endMinutes = 18 * 60;
     double dailySalary = 500.0;
     int uiScalePercent = 100;
     int opacityPercent = 100;
+    EndInputMode endInputMode = EndInputMode::EndTime;
 };
 
 // Pure: clamps every field into range and falls back to the defaults for a

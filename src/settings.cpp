@@ -23,6 +23,11 @@ constexpr double kMaxDailySalary = 1000000.0;
 Settings NormalizeSettings(const Settings& settings) {
     Settings normalized = settings;
 
+    if (settings.endInputMode != EndInputMode::EndTime &&
+        settings.endInputMode != EndInputMode::WorkDuration) {
+        normalized.endInputMode = EndInputMode::EndTime;
+    }
+
     normalized.uiScalePercent =
         std::clamp(settings.uiScalePercent, kMinScalePercent, kMaxScalePercent);
     normalized.opacityPercent =
@@ -72,6 +77,14 @@ Settings LoadSettings(const std::wstring& path) {
     settings.opacityPercent = static_cast<int>(GetPrivateProfileIntW(
         L"window", L"opacityPercent", settings.opacityPercent, path.c_str()));
 
+    wchar_t inputMode[32] = {};
+    GetPrivateProfileStringW(
+        L"work", L"endInputMode", L"endTime", inputMode,
+        static_cast<DWORD>(std::size(inputMode)), path.c_str());
+    settings.endInputMode = _wcsicmp(inputMode, L"duration") == 0
+        ? EndInputMode::WorkDuration
+        : EndInputMode::EndTime;
+
     wchar_t salary[64] = {};
     GetPrivateProfileStringW(
         L"work", L"dailySalary", L"500", salary,
@@ -93,6 +106,12 @@ void SaveSettings(const std::wstring& path, const Settings& settings) {
     WritePrivateProfileStringW(L"work", L"startMinutes", value, path.c_str());
     swprintf_s(value, L"%d", normalized.endMinutes);
     WritePrivateProfileStringW(L"work", L"endMinutes", value, path.c_str());
+    WritePrivateProfileStringW(
+        L"work", L"endInputMode",
+        normalized.endInputMode == EndInputMode::WorkDuration
+            ? L"duration"
+            : L"endTime",
+        path.c_str());
     swprintf_s(value, L"%.2f", normalized.dailySalary);
     WritePrivateProfileStringW(L"work", L"dailySalary", value, path.c_str());
     swprintf_s(value, L"%d", normalized.uiScalePercent);

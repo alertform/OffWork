@@ -82,7 +82,9 @@ inline constexpr LogicalRect kPanel{20, 306, 340, 642};
 
 inline constexpr LogicalRect kStartLabel{37, 313, 220, 334};
 inline constexpr LogicalRect kStartBox{37, 338, 323, 372};
-inline constexpr LogicalRect kEndLabel{37, 376, 220, 397};
+inline constexpr LogicalRect kEndModeLabel{37, 376, 112, 397};
+inline constexpr LogicalRect kEndTimeModeButton{112, 374, 212, 399};
+inline constexpr LogicalRect kDurationModeButton{216, 374, 323, 399};
 inline constexpr LogicalRect kEndBox{37, 401, 323, 435};
 inline constexpr LogicalRect kSalaryLabel{37, 439, 220, 460};
 inline constexpr LogicalRect kSalaryBox{37, 464, 323, 498};
@@ -109,6 +111,8 @@ enum class HotElement {
     StartField,
     EndField,
     SalaryField,
+    EndTimeMode,
+    DurationMode,
     Opacity,
     Autostart,
     Save,

@@ -16,7 +16,35 @@ bool Near(double left, double right, double epsilon = 0.0001) {
 
 int main() {
     using offwork::CalculateWorkday;
+    using offwork::DurationMinutesFromHours;
+    using offwork::EndMinutesFromDuration;
+    using offwork::WorkDurationMinutes;
     using offwork::WorkdayPhase;
+
+    CHECK(EndMinutesFromDuration(9 * 60, 8 * 60) == 17 * 60);
+    CHECK(EndMinutesFromDuration(9 * 60, 9 * 60) == 18 * 60);
+    CHECK(EndMinutesFromDuration(22 * 60, 8 * 60) == 6 * 60);
+    CHECK(WorkDurationMinutes(9 * 60, 17 * 60) == 8 * 60);
+    CHECK(WorkDurationMinutes(22 * 60, 6 * 60) == 8 * 60);
+    CHECK(DurationMinutesFromHours(8.0) == 8 * 60);
+    CHECK(DurationMinutesFromHours(8.5) == 8 * 60 + 30);
+    CHECK(DurationMinutesFromHours(9.0) == 9 * 60);
+
+    bool invalidDuration = false;
+    try {
+        (void)EndMinutesFromDuration(9 * 60, 24 * 60);
+    } catch (const std::invalid_argument&) {
+        invalidDuration = true;
+    }
+    CHECK(invalidDuration);
+
+    bool invalidDurationHours = false;
+    try {
+        (void)DurationMinutesFromHours(24.0);
+    } catch (const std::invalid_argument&) {
+        invalidDurationHours = true;
+    }
+    CHECK(invalidDurationHours);
 
     const auto working = CalculateWorkday(13 * 3600 + 30 * 60, 9 * 60, 18 * 60, 900.0);
     CHECK(working.phase == WorkdayPhase::Working);
@@ -58,4 +86,3 @@ int main() {
     std::cout << "All OffWork calculation tests passed.\n";
     return 0;
 }
-

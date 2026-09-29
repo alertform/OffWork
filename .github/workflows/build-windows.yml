@@ -78,7 +78,7 @@ jobs:
       - name: Build installer
         shell: pwsh
         run: |
-          $version = '0.2.0'
+          $version = '0.3.0'
           if ($env:GITHUB_REF -like 'refs/tags/v*') {
             $version = $env:GITHUB_REF_NAME.TrimStart('v')
           }
@@ -121,6 +121,8 @@ jobs:
           - 原生 C++/Win32，无 .NET 或 WinUI 运行时
           - 实时显示下班倒计时、工作进度和今日已赚金额
           - 支持跨午夜班次、设置持久化、单实例和窗口置顶
+          - 支持按下班时间或工作时长计算下班时间
+          - 系统托盘可显示/隐藏窗口、切换开机自启和彻底退出
           - 窗口 75%-150% 等比缩放, 缩放过程逐帧一致
           - 25%-100% 不透明度滑杆
           - 应用内「开机自启」开关, 以注册表为准, 安装版与免安装版通用

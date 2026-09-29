@@ -9,6 +9,7 @@
 #include "settings.h"
 #include "text_field.h"
 #include "theme.h"
+#include "tray_icon.h"
 
 #include <windows.h>
 
@@ -27,7 +28,7 @@ inline constexpr std::size_t kSalaryMaxLength = 16;
 inline constexpr int kFieldCount = 3;
 
 inline constexpr wchar_t kDefaultFooter[] = L"设置和窗口大小保存在本机";
-inline constexpr wchar_t kValidationFooter[] = L"请输入 HH:MM 时间和有效日薪";
+inline constexpr wchar_t kValidationFooter[] = L"请输入有效时间、工作时长和日薪";
 
 struct AppState {
     HWND window = nullptr;
@@ -36,6 +37,8 @@ struct AppState {
     int fontScale = 0;
     HICON icon = nullptr;
     UINT dpi = 96;
+    UINT taskbarCreatedMessage = 0;
+    TrayIcon trayIcon;
 
     Settings settings;
     std::wstring settingsPath;
@@ -43,6 +46,7 @@ struct AppState {
     bool expanded = false;
     bool pinned = true;
     bool autostartEnabled = false;
+    EndInputMode editEndInputMode = EndInputMode::EndTime;
     HotElement hot = HotElement::None;
 
     FieldState fields[kFieldCount];
