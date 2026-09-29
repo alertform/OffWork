@@ -69,7 +69,6 @@ struct AppState {
     HFONT countdownFont = nullptr;
     HFONT amountFont = nullptr;
     HFONT buttonFont = nullptr;
-    HFONT iconFont = nullptr;
     HBRUSH editBrush = nullptr;
     UINT dpi = 96;
     bool pinned = true;
@@ -115,7 +114,6 @@ void CreateFonts() {
     DestroyFontHandle(g.countdownFont);
     DestroyFontHandle(g.amountFont);
     DestroyFontHandle(g.buttonFont);
-    DestroyFontHandle(g.iconFont);
 
     g.titleFont = MakeFont(15, FW_SEMIBOLD, L"Segoe UI Variable Text");
     g.tinyFont = MakeFont(10, FW_NORMAL, L"Segoe UI Variable Text");
@@ -123,7 +121,6 @@ void CreateFonts() {
     g.countdownFont = MakeFont(36, FW_SEMIBOLD, L"Cascadia Mono");
     g.amountFont = MakeFont(30, FW_SEMIBOLD, L"Segoe UI Variable Display");
     g.buttonFont = MakeFont(13, FW_SEMIBOLD, L"Segoe UI Variable Text");
-    g.iconFont = MakeFont(16, FW_NORMAL, L"Segoe Fluent Icons");
 
     if (g.startEdit != nullptr) {
         SendMessageW(g.startEdit, WM_SETFONT, reinterpret_cast<WPARAM>(g.labelFont), TRUE);
@@ -383,10 +380,14 @@ HotElement HitElement(POINT point) {
 }
 
 void DrawPin(HDC dc, const RECT& rect) {
-    DrawTextInRect(
-        dc, L"\xE840", rect, g.iconFont,
-        g.pinned ? RGB(6, 28, 43) : kTextPrimary,
-        DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+    const int left = MulDiv(rect.left, 96, static_cast<int>(g.dpi));
+    const int top = MulDiv(rect.top, 96, static_cast<int>(g.dpi));
+    const COLORREF color = g.pinned ? RGB(6, 28, 43) : kTextPrimary;
+    DrawLine(dc, left + 11, top + 9, left + 21, top + 9, color, 2);
+    DrawLine(dc, left + 13, top + 9, left + 13, top + 16, color, 1);
+    DrawLine(dc, left + 19, top + 9, left + 19, top + 16, color, 1);
+    DrawLine(dc, left + 10, top + 16, left + 22, top + 16, color, 2);
+    DrawLine(dc, left + 16, top + 16, left + 16, top + 24, color, 1);
 }
 
 void DrawClose(HDC dc, const RECT& rect) {
@@ -687,7 +688,6 @@ LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
             DestroyFontHandle(g.countdownFont);
             DestroyFontHandle(g.amountFont);
             DestroyFontHandle(g.buttonFont);
-            DestroyFontHandle(g.iconFont);
             if (g.editBrush != nullptr) {
                 DeleteObject(g.editBrush);
                 g.editBrush = nullptr;
