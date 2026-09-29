@@ -26,7 +26,7 @@ public sealed partial class MainWindow : Window
     {
         InitializeComponent();
 
-        Title = "下班小助手";
+        Title = "OffWork";
         SystemBackdrop = new MicaBackdrop { Kind = MicaKind.BaseAlt };
 
         var windowHandle = WindowNative.GetWindowHandle(this);
@@ -49,6 +49,13 @@ public sealed partial class MainWindow : Window
     private void ConfigureWindow()
     {
         _appWindow.IsShownInSwitchers = false;
+        ExtendsContentIntoTitleBar = true;
+        SetTitleBar(TitleBarDragRegion);
+
+        _appWindow.TitleBar.ButtonBackgroundColor = Colors.Transparent;
+        _appWindow.TitleBar.ButtonInactiveBackgroundColor = Colors.Transparent;
+        UpdateTitleBarInsets();
+        _appWindow.TitleBar.LayoutMetricsChanged += (_, _) => UpdateTitleBarInsets();
 
         if (_appWindow.Presenter is OverlappedPresenter presenter)
         {
@@ -92,7 +99,7 @@ public sealed partial class MainWindow : Window
             _settings.EndTime,
             _settings.DailySalary);
 
-        CurrentTimeText.Text = now.ToString("M月d日 dddd  HH:mm:ss", ChineseCulture);
+        CurrentTimeText.Text = now.ToString("M月d日  HH:mm:ss", ChineseCulture);
         WorkProgressBar.Value = snapshot.Progress * 100;
         ProgressText.Text = $"今日进度 {snapshot.Progress:P0}";
         EarnedText.Text = snapshot.Earned.ToString("C2", ChineseCulture);
@@ -177,6 +184,11 @@ public sealed partial class MainWindow : Window
         {
             presenter.IsAlwaysOnTop = PinButton.IsChecked == true;
         }
+    }
+
+    private void UpdateTitleBarInsets()
+    {
+        TitleBarRightInset.Width = _appWindow.TitleBar.RightInset;
     }
 
     private void SettingsExpander_Expanding(

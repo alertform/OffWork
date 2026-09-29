@@ -14,7 +14,7 @@ public sealed record AppSettings(
 
     private static string SettingsPath => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "DwhOffWork",
+        "OffWork",
         "settings.json");
 
     public static AppSettings Load()
@@ -61,4 +61,3 @@ public sealed record AppSettings(
         StartMinutes != EndMinutes &&
         DailySalary >= 0;
 }
-

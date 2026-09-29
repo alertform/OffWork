@@ -1,6 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
+    <AssemblyName>OffWork</AssemblyName>
+    <Product>OffWork</Product>
+    <Title>OffWork</Title>
     <TargetFramework>net10.0-windows10.0.26100.0</TargetFramework>
     <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
     <RootNamespace>DwhOffWork</RootNamespace>
@@ -33,4 +36,3 @@
     <ProjectReference Include="..\DwhOffWork.Core\DwhOffWork.Core.csproj" />
   </ItemGroup>
 </Project>
-

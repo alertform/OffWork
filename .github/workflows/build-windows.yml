@@ -1,4 +1,4 @@
-name: Build Windows EXE
+name: Build OffWork Windows EXE
 
 on:
   workflow_dispatch:
@@ -37,14 +37,13 @@ jobs:
       - name: Verify executable exists
         shell: pwsh
         run: |
-          $exe = 'artifacts/win-x64/DwhOffWork.exe'
+          $exe = 'artifacts/win-x64/OffWork.exe'
           if (-not (Test-Path $exe)) { throw "Missing $exe" }
           Get-Item $exe | Format-List Name, Length, LastWriteTime
 
       - name: Upload Windows executable
         uses: actions/upload-artifact@v4
         with:
-          name: DwhOffWork-win-x64
-          path: artifacts/win-x64/DwhOffWork.exe
+          name: OffWork-win-x64
+          path: artifacts/win-x64/OffWork.exe
           if-no-files-found: error
-
