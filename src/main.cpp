@@ -94,7 +94,7 @@ bool Contains(const RECT& rect, POINT point) {
     return PtInRect(&rect, point) != FALSE;
 }
 
-void DeleteFont(HFONT& font) {
+void DestroyFontHandle(HFONT& font) {
     if (font != nullptr) {
         DeleteObject(font);
         font = nullptr;
@@ -109,13 +109,13 @@ HFONT MakeFont(int pixelSize, int weight, const wchar_t* family) {
 }
 
 void CreateFonts() {
-    DeleteFont(g.titleFont);
-    DeleteFont(g.tinyFont);
-    DeleteFont(g.labelFont);
-    DeleteFont(g.countdownFont);
-    DeleteFont(g.amountFont);
-    DeleteFont(g.buttonFont);
-    DeleteFont(g.iconFont);
+    DestroyFontHandle(g.titleFont);
+    DestroyFontHandle(g.tinyFont);
+    DestroyFontHandle(g.labelFont);
+    DestroyFontHandle(g.countdownFont);
+    DestroyFontHandle(g.amountFont);
+    DestroyFontHandle(g.buttonFont);
+    DestroyFontHandle(g.iconFont);
 
     g.titleFont = MakeFont(15, FW_SEMIBOLD, L"Segoe UI Variable Text");
     g.tinyFont = MakeFont(10, FW_NORMAL, L"Segoe UI Variable Text");
@@ -681,13 +681,13 @@ LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
             return 0;
         case WM_DESTROY:
             KillTimer(window, kClockTimer);
-            DeleteFont(g.titleFont);
-            DeleteFont(g.tinyFont);
-            DeleteFont(g.labelFont);
-            DeleteFont(g.countdownFont);
-            DeleteFont(g.amountFont);
-            DeleteFont(g.buttonFont);
-            DeleteFont(g.iconFont);
+            DestroyFontHandle(g.titleFont);
+            DestroyFontHandle(g.tinyFont);
+            DestroyFontHandle(g.labelFont);
+            DestroyFontHandle(g.countdownFont);
+            DestroyFontHandle(g.amountFont);
+            DestroyFontHandle(g.buttonFont);
+            DestroyFontHandle(g.iconFont);
             if (g.editBrush != nullptr) {
                 DeleteObject(g.editBrush);
                 g.editBrush = nullptr;
