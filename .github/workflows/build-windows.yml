@@ -1,0 +1,50 @@
+name: Build Windows EXE
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+
+jobs:
+  test-and-build:
+    runs-on: windows-latest
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Test calculation logic
+        shell: pwsh
+        run: dotnet test tests/DwhOffWork.Core.Tests/DwhOffWork.Core.Tests.csproj -c Release
+
+      - name: Publish x64 single-file EXE
+        shell: pwsh
+        run: >-
+          dotnet publish src/DwhOffWork/DwhOffWork.csproj
+          -c Release
+          -r win-x64
+          -p:Platform=x64
+          -o artifacts/win-x64
+
+      - name: Verify executable exists
+        shell: pwsh
+        run: |
+          $exe = 'artifacts/win-x64/DwhOffWork.exe'
+          if (-not (Test-Path $exe)) { throw "Missing $exe" }
+          Get-Item $exe | Format-List Name, Length, LastWriteTime
+
+      - name: Upload Windows executable
+        uses: actions/upload-artifact@v4
+        with:
+          name: DwhOffWork-win-x64
+          path: artifacts/win-x64/DwhOffWork.exe
+          if-no-files-found: error
+
