@@ -115,12 +115,12 @@ void CreateFonts() {
     DestroyFontHandle(g.amountFont);
     DestroyFontHandle(g.buttonFont);
 
-    g.titleFont = MakeFont(15, FW_SEMIBOLD, L"Segoe UI Variable Text");
-    g.tinyFont = MakeFont(10, FW_NORMAL, L"Segoe UI Variable Text");
-    g.labelFont = MakeFont(13, FW_NORMAL, L"Segoe UI Variable Text");
-    g.countdownFont = MakeFont(36, FW_SEMIBOLD, L"Cascadia Mono");
-    g.amountFont = MakeFont(30, FW_SEMIBOLD, L"Segoe UI Variable Display");
-    g.buttonFont = MakeFont(13, FW_SEMIBOLD, L"Segoe UI Variable Text");
+    g.titleFont = MakeFont(16, FW_SEMIBOLD, L"Microsoft YaHei UI");
+    g.tinyFont = MakeFont(11, FW_NORMAL, L"Microsoft YaHei UI");
+    g.labelFont = MakeFont(15, FW_NORMAL, L"Microsoft YaHei UI");
+    g.countdownFont = MakeFont(36, FW_SEMIBOLD, L"Bahnschrift");
+    g.amountFont = MakeFont(30, FW_SEMIBOLD, L"Bahnschrift");
+    g.buttonFont = MakeFont(14, FW_SEMIBOLD, L"Microsoft YaHei UI");
 
     if (g.startEdit != nullptr) {
         SendMessageW(g.startEdit, WM_SETFONT, reinterpret_cast<WPARAM>(g.labelFont), TRUE);
@@ -244,9 +244,9 @@ void PopulateEditors() {
 
 void ArrangeEditors() {
     const RECT editRects[] = {
-        ScaledRect(37, 344, 323, 380),
-        ScaledRect(37, 411, 323, 447),
-        ScaledRect(37, 478, 323, 514),
+        ScaledRect(45, 350, 315, 374),
+        ScaledRect(45, 417, 315, 441),
+        ScaledRect(45, 484, 315, 508),
     };
     HWND edits[] = {g.startEdit, g.endEdit, g.salaryEdit};
     for (int index = 0; index < 3; ++index) {
