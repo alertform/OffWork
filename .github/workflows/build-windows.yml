@@ -7,6 +7,9 @@ on:
     tags: ['v*']
   pull_request:
 
+env:
+  INNO_VERSION: '6.7.3'
+
 jobs:
   test-and-build:
     runs-on: windows-latest
@@ -26,7 +29,7 @@ jobs:
         shell: pwsh
         run: cmake --build build --config Release --parallel
 
-      - name: Run calculation tests
+      - name: Run tests
         shell: pwsh
         run: ctest --test-dir build -C Release --output-on-failure
 
@@ -44,11 +47,58 @@ jobs:
           $exe | Format-List Name, Length, LastWriteTime
           $hash | Format-List Algorithm, Hash
 
-      - name: Upload Windows executable
+      - name: Resolve Inno Setup
+        shell: pwsh
+        run: |
+          # The hosted image usually ships Inno Setup, but "usually" is not a
+          # build input. Look in every place it can legitimately be, and install
+          # a pinned version if it is genuinely absent.
+          function Find-Iscc {
+            @(
+              "$env:ProgramFiles\Inno Setup 6\ISCC.exe",
+              "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe",
+              "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe"
+            ) | Where-Object { Test-Path $_ } | Select-Object -First 1
+          }
+
+          $iscc = Find-Iscc
+          if (-not $iscc) {
+            Write-Host "Inno Setup not found, installing $env:INNO_VERSION"
+            choco install innosetup --version=$env:INNO_VERSION -y --no-progress
+            $iscc = Find-Iscc
+          }
+          if (-not $iscc) {
+            throw "Inno Setup 6 could not be located or installed"
+          }
+
+          Write-Host "Using $iscc"
+          & $iscc /? | Select-Object -First 1
+          "ISCC=$iscc" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Build installer
+        shell: pwsh
+        run: |
+          $version = '0.2.0'
+          if ($env:GITHUB_REF -like 'refs/tags/v*') {
+            $version = $env:GITHUB_REF_NAME.TrimStart('v')
+          }
+          Write-Host "Installer version $version"
+
+          & $env:ISCC "/DAppVersion=$version" installer\offwork.iss
+          if ($LASTEXITCODE -ne 0) { throw "ISCC failed with $LASTEXITCODE" }
+
+          Copy-Item build/installer/OffWork-Setup.exe artifacts/win-x64/OffWork-Setup.exe
+          $setup = Get-Item artifacts/win-x64/OffWork-Setup.exe
+          $setup | Format-List Name, Length, LastWriteTime
+          Get-FileHash $setup.FullName -Algorithm SHA256 | Format-List Algorithm, Hash
+
+      - name: Upload Windows artifacts
         uses: actions/upload-artifact@v4
         with:
           name: OffWork-win-x64
-          path: artifacts/win-x64/OffWork.exe
+          path: |
+            artifacts/win-x64/OffWork.exe
+            artifacts/win-x64/OffWork-Setup.exe
           if-no-files-found: error
 
       - name: Publish GitHub Release
@@ -60,15 +110,26 @@ jobs:
           @"
           一只陪你等下班的小猫悬浮窗。
 
+          两种下载方式:
+
+          - **OffWork-Setup.exe** — 安装版。可以自选安装目录, 创建开始菜单和桌面快捷方式,
+            可选开机自启, 并在「应用和功能」里注册卸载入口。安装到当前用户目录, 不需要管理员权限。
+          - **OffWork.exe** — 免安装版。单文件直接运行, 不写快捷方式, 不注册卸载入口。
+
+          本版内容:
+
           - 原生 C++/Win32，无 .NET 或 WinUI 运行时
           - 实时显示下班倒计时、工作进度和今日已赚金额
           - 支持跨午夜班次、设置持久化、单实例和窗口置顶
-          - 内嵌多尺寸小猫图标，单文件免安装
+          - 窗口 75%-150% 等比缩放, 缩放过程逐帧一致
+          - 25%-100% 不透明度滑杆
+          - 应用内「开机自启」开关, 以注册表为准, 安装版与免安装版通用
 
           该版本尚未进行代码签名，Windows 可能显示安全提示。
           "@ | Set-Content release-notes.md -Encoding utf8
 
           gh release create $env:GITHUB_REF_NAME `
+            "artifacts/win-x64/OffWork-Setup.exe#OffWork-Setup.exe" `
             "artifacts/win-x64/OffWork.exe#OffWork.exe" `
             --repo $env:GITHUB_REPOSITORY `
             --title "OffWork $env:GITHUB_REF_NAME" `

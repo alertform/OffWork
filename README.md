@@ -6,19 +6,71 @@
 
 ## 下载
 
-前往 [Releases](https://github.com/alertform/OffWork/releases/latest) 下载 `OffWork.exe`。目前提供 Windows x64 单文件版本，支持 Windows 10 和 Windows 11。
+前往 [Releases](https://github.com/alertform/OffWork/releases/latest)，两种方式任选其一。支持 Windows 10 和 Windows 11 的 x64 版本。
+
+| | `OffWork-Setup.exe`（安装版） | `OffWork.exe`（免安装版） |
+|---|---|---|
+| 安装目录 | 可自选，默认装到当前用户目录 | 放哪就在哪运行 |
+| 开始菜单快捷方式 | ✅ | ❌ |
+| 桌面快捷方式 | 可选 | ❌ |
+| 开机自启 | 安装时可勾选，装好后也能在应用里改 | 应用里可随时开关 |
+| 卸载入口 | 出现在「应用和功能」里 | 直接删掉 exe 即可 |
+| 管理员权限 | 不需要 | 不需要 |
+
+两种方式装出来的是同一个程序，功能没有差别。
+
+## 安装版
+
+运行 `OffWork-Setup.exe`，向导有两页需要你做选择：
+
+1. **选择安装位置**。默认是 `%LOCALAPPDATA%\Programs\OffWork`，也就是当前用户自己的目录，所以**全程不需要管理员权限，不会弹 UAC**。想装到别处，点「浏览」换一个目录即可。
+2. **选择附加任务**：
+   - **创建桌面快捷方式** —— 默认不勾。
+   - **开机自启（登录时自动运行 OffWork）** —— 默认不勾。
+   - 装完那一页还有 **安装完成后运行 OffWork**。
+
+开始菜单快捷方式总是会创建。
+
+### 开机自启怎么改
+
+装好之后随时可以改，不用重装：**展开「设置」→ 切换「开机自启」开关**。
+
+这个开关读写的就是 Windows 真正的启动项：
+
+```text
+HKCU\Software\Microsoft\Windows\CurrentVersion\Run  ->  值名 OffWork
+```
+
+值里存的是带引号的完整 exe 路径，所以装在带空格的目录里也能正常启动。**注册表是唯一真相**，应用不会另存一份开关状态在配置文件里；也就是说你在别处（比如任务管理器的「启动」页）改了它，OffWork 下次展开设置时显示的就是改过之后的状态。
+
+免安装版同样支持这个开关，注册的是**当前这个 exe 自己的路径**。如果你先用安装版开了自启，之后又去跑某个免安装副本并再次开启，启动项会指向后者。
+
+### 卸载
+
+在「设置 → 应用 → 已安装的应用」里找到 OffWork 卸载，或者运行安装目录下的 `unins000.exe`。卸载会移除：
+
+- 安装的程序文件和安装目录
+- 开始菜单快捷方式，以及安装时创建的桌面快捷方式
+- 「应用和功能」里的卸载入口
+- `OffWork` 这一项开机自启注册表值（无论它是安装时勾的，还是你后来在应用里开的）
+
+**卸载不会删除你的设置。** `%LOCALAPPDATA%\OffWork\settings.ini` 会保留，重新安装后上下班时间、日薪、窗口大小和不透明度都还在。想彻底清干净就手动删掉这个文件。
+
+## 免安装版
+
+直接双击 `OffWork.exe` 就能用，不写快捷方式、不注册卸载入口。设置仍然保存在 `%LOCALAPPDATA%\OffWork\settings.ini`（和安装版共用同一份），删掉 exe 就算卸载完成 —— 但如果你在免安装版里开过「开机自启」，记得先把开关关掉，否则那条注册表值会指向一个已经不存在的文件。
 
 ## 使用方法
 
-1. 双击运行 `OffWork.exe`，悬浮窗会出现在屏幕右上角。
-2. 展开“设置”，以 `HH:MM` 格式填写上班和下班时间，再填写日薪。
-3. 点击“保存设置”，倒计时和已赚金额会立即更新并自动收起设置。
-4. 点击标题栏图钉，可以开启或取消窗口置顶。
-5. 拖动窗口边缘或右下角可以等比例调整大小；在设置里可用滑动条调节不透明度。
+1. 运行 OffWork，悬浮窗会出现在屏幕右上角。
+2. 展开「设置」，以 `HH:MM` 格式填写上班和下班时间，再填写日薪。
+3. 点「保存设置」，倒计时和已赚金额会立即更新并自动收起设置。
+4. 点标题栏图钉，可以开启或取消窗口置顶。
+5. 拖动窗口边缘或四角可以等比例调整大小；设置里可以调不透明度和开机自启。
+
+输入框支持光标移动、选中（拖选或双击全选）、`Tab` 切换、以及 `Ctrl+A/C/X/V`。时间框只接受数字和冒号，日薪框只接受数字和小数点。
 
 应用采用单实例设计：再次运行 exe 会唤起已有窗口，不会叠出多个悬浮窗。
-
-设置保存在 `%LOCALAPPDATA%\OffWork\settings.ini`。删除这个文件即可恢复默认值。
 
 ## 功能
 
@@ -26,12 +78,16 @@
 - 根据有效工作时长线性计算今日已赚金额
 - 支持跨午夜班次
 - 默认置顶，并可随时取消
-- 支持 75%–150% 等比例缩放并自动记住大小
+- 75%–150% 等比例缩放并自动记住大小，**缩放过程逐帧一致，没有残影**
 - 25%–100% 不透明度滑动调节，默认完全不透明
+- 应用内「开机自启」开关，以注册表为准
 - 自动记住上下班时间和日薪
-- 原生双缓冲绘制，设置收起只执行一次尺寸更新
-- 内嵌多尺寸小猫程序图标
+- 内嵌多尺寸小猫程序图标，Explorer 属性里有完整版本信息
 - 单个原生 Win32 exe，无 .NET/WinUI/Electron 运行时
+
+### 关于缩放不留残影
+
+窗口的尺寸、位置和像素由一次 `UpdateLayeredWindow` 一起提交，并且缩放拖拽由应用自己接管，不走系统的 sizing loop。这样被合成的每一帧，几何和内容天生就是配套的 —— 不存在「窗口已经变成新尺寸、内容还是旧的」那一帧。
 
 ## 金额计算
 
@@ -55,8 +111,18 @@ cmake --build build --config Release --parallel
 ctest --test-dir build -C Release --output-on-failure
 ```
 
-构建结果位于 `build\Release\OffWork.exe`。仓库的 **Build OffWork Windows EXE** workflow 会运行测试、检查包体并上传构建产物。
+构建结果位于 `build\Release\OffWork.exe`。
+
+构建安装包需要 [Inno Setup 6](https://jrsoftware.org/isdl.php)（`winget install JRSoftware.InnoSetup`）：
+
+```powershell
+& "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe" installer\offwork.iss
+```
+
+产物位于 `build\installer\OffWork-Setup.exe`。
+
+仓库的 **Build OffWork Windows EXE** workflow 会跑测试、检查包体、构建安装包，并把 `OffWork.exe` 和 `OffWork-Setup.exe` 一起上传；打 `v*` tag 时两个文件都会发布到 Release。
 
 ## 隐私
 
-OffWork 不收集任何数据。上下班时间和日薪只写入当前 Windows 用户的本地配置目录。
+OffWork 不收集任何数据。上下班时间和日薪只写入当前 Windows 用户的本地配置目录；开机自启只写入当前用户的注册表启动项。
