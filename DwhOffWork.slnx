@@ -1,6 +1,0 @@
-<Solution>
-  <Project Path="src/DwhOffWork.Core/DwhOffWork.Core.csproj" />
-  <Project Path="src/DwhOffWork/DwhOffWork.csproj" />
-  <Project Path="tests/DwhOffWork.Core.Tests/DwhOffWork.Core.Tests.csproj" />
-</Solution>
-

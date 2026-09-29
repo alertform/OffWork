@@ -1,8 +1,10 @@
 bin/
 obj/
+build/
+out/
+/build*/
 TestResults/
 artifacts/
 *.user
 *.suo
 .vs/
-

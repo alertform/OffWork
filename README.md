@@ -1,23 +1,23 @@
 # OffWork 🐱
 
-一只陪你等下班的小猫悬浮窗。
+一只陪你等下班的 Windows 原生悬浮窗。
 
-填写上下班时间和日薪后，OffWork 会实时显示距离下班还有多久、今天的工作进度，以及此刻已经赚到的金额。数据只保存在本机，不需要登录，也不会联网。
+填写上下班时间和日薪后，OffWork 会实时显示距离下班还有多久、今天的工作进度，以及此刻已经赚到的金额。它不需要安装运行时、不需要登录，也不会联网。
 
 ## 下载
 
-前往 [Releases](https://github.com/alertform/OffWork/releases/latest) 下载 `OffWork.exe`。目前提供 Windows x64 单文件版本，支持 Windows 10 1809 及以上系统。
-
-第一次启动时，Windows 可能需要几秒钟解压自带的 .NET 与 WinUI 运行组件。
+前往 [Releases](https://github.com/alertform/OffWork/releases/latest) 下载 `OffWork.exe`。目前提供 Windows x64 单文件版本，支持 Windows 10 和 Windows 11。
 
 ## 使用方法
 
 1. 双击运行 `OffWork.exe`，悬浮窗会出现在屏幕右上角。
-2. 展开“设置”，填写上班时间、下班时间和日薪。
-3. 点击“保存设置”，倒计时与已赚金额会立即开始更新。
-4. 点击标题栏上的图钉，可以开启或取消窗口置顶。
+2. 展开“设置”，以 `HH:MM` 格式填写上班和下班时间，再填写日薪。
+3. 点击“保存设置”，倒计时和已赚金额会立即更新并自动收起设置。
+4. 点击标题栏图钉，可以开启或取消窗口置顶。
 
-设置会保存在 `%LOCALAPPDATA%\OffWork\settings.json`。删除这个文件即可恢复默认值。
+应用采用单实例设计：再次运行 exe 会唤起已有窗口，不会叠出多个悬浮窗。
+
+设置保存在 `%LOCALAPPDATA%\OffWork\settings.ini`。删除这个文件即可恢复默认值。
 
 ## 功能
 
@@ -25,9 +25,10 @@
 - 根据有效工作时长线性计算今日已赚金额
 - 支持跨午夜班次
 - 默认置顶，并可随时取消
-- 自动记住上下班时间与日薪
-- 原生 WinUI 3 界面，跟随 Windows 深色或浅色主题
-- 单个 `OffWork.exe`，无需安装
+- 自动记住上下班时间和日薪
+- 原生双缓冲绘制，设置收起只执行一次尺寸更新
+- 内嵌多尺寸小猫程序图标
+- 单个原生 Win32 exe，无 .NET/WinUI/Electron 运行时
 
 ## 金额计算
 
@@ -41,21 +42,17 @@
 
 ## 开发与构建
 
-项目使用 C#、.NET 10、WinUI 3 和 Windows App SDK。计算逻辑与界面工程分离，并包含上班前、工作中、下班后和跨午夜班次的单元测试。
+项目使用 C++20、Win32 API、GDI 和 CMake。Release 使用静态 MSVC 运行时，因此最终交付只有一个 exe。
 
-在 Windows 上执行：
+在 Visual Studio Developer PowerShell 中执行：
 
 ```powershell
-dotnet test tests\DwhOffWork.Core.Tests\DwhOffWork.Core.Tests.csproj -c Release
-
-dotnet publish src\DwhOffWork\DwhOffWork.csproj `
-  -c Release `
-  -r win-x64 `
-  -p:Platform=x64 `
-  -o artifacts\win-x64
+cmake -S . -B build -A x64 -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded
+cmake --build build --config Release --parallel
+ctest --test-dir build -C Release --output-on-failure
 ```
 
-构建结果位于 `artifacts\win-x64\OffWork.exe`。也可以打开 `DwhOffWork.slnx`，或通过仓库的 **Build OffWork Windows EXE** workflow 构建。
+构建结果位于 `build\Release\OffWork.exe`。仓库的 **Build OffWork Windows EXE** workflow 会运行测试、检查包体并上传构建产物。
 
 ## 隐私
 

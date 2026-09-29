@@ -16,30 +16,33 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up .NET 10
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '10.0.x'
-
-      - name: Test calculation logic
-        shell: pwsh
-        run: dotnet test tests/DwhOffWork.Core.Tests/DwhOffWork.Core.Tests.csproj -c Release
-
-      - name: Publish x64 single-file EXE
+      - name: Configure native x64 build
         shell: pwsh
         run: >-
-          dotnet publish src/DwhOffWork/DwhOffWork.csproj
-          -c Release
-          -r win-x64
-          -p:Platform=x64
-          -o artifacts/win-x64
+          cmake -S . -B build -A x64
+          -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded
 
-      - name: Verify executable exists
+      - name: Build native release
+        shell: pwsh
+        run: cmake --build build --config Release --parallel
+
+      - name: Run calculation tests
+        shell: pwsh
+        run: ctest --test-dir build -C Release --output-on-failure
+
+      - name: Stage executable
         shell: pwsh
         run: |
-          $exe = 'artifacts/win-x64/OffWork.exe'
-          if (-not (Test-Path $exe)) { throw "Missing $exe" }
-          Get-Item $exe | Format-List Name, Length, LastWriteTime
+          New-Item -ItemType Directory -Force artifacts/win-x64 | Out-Null
+          Copy-Item build/Release/OffWork.exe artifacts/win-x64/OffWork.exe
+
+          $exe = Get-Item artifacts/win-x64/OffWork.exe
+          if ($exe.Length -gt 10MB) {
+            throw "Native executable unexpectedly exceeds 10 MB: $($exe.Length) bytes"
+          }
+          $hash = Get-FileHash $exe.FullName -Algorithm SHA256
+          $exe | Format-List Name, Length, LastWriteTime
+          $hash | Format-List Algorithm, Hash
 
       - name: Upload Windows executable
         uses: actions/upload-artifact@v4
@@ -57,12 +60,12 @@ jobs:
           @"
           一只陪你等下班的小猫悬浮窗。
 
+          - 原生 C++/Win32，无 .NET 或 WinUI 运行时
           - 实时显示下班倒计时、工作进度和今日已赚金额
-          - 支持跨午夜班次、设置持久化和窗口置顶
-          - 自定义小猫标题栏，支持 Windows 深色/浅色主题
-          - Windows x64 单文件版本，无需安装
+          - 支持跨午夜班次、设置持久化、单实例和窗口置顶
+          - 内嵌多尺寸小猫图标，单文件免安装
 
-          首次启动可能需要几秒钟解压自带运行组件。该版本尚未进行代码签名，Windows 可能显示安全提示。
+          该版本尚未进行代码签名，Windows 可能显示安全提示。
           "@ | Set-Content release-notes.md -Encoding utf8
 
           gh release create $env:GITHUB_REF_NAME `

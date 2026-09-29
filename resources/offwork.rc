@@ -1,0 +1,5 @@
+#include "resource.h"
+
+IDI_OFFWORK ICON "offwork.ico"
+1 RT_MANIFEST "app.manifest"
+
