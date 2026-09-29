@@ -27,7 +27,10 @@ constexpr int kEndEditId = 1002;
 constexpr int kSalaryEditId = 1003;
 constexpr int kWindowWidth = 360;
 constexpr int kCollapsedHeight = 330;
-constexpr int kExpandedHeight = 636;
+constexpr int kExpandedHeight = 690;
+constexpr int kMinScalePercent = 75;
+constexpr int kMaxScalePercent = 150;
+constexpr BYTE kTranslucentAlpha = 217;
 
 constexpr COLORREF kBackground = RGB(4, 17, 35);
 constexpr COLORREF kTitleBackground = RGB(18, 29, 44);
@@ -47,6 +50,8 @@ struct Settings {
     int startMinutes = 9 * 60;
     int endMinutes = 18 * 60;
     double dailySalary = 500.0;
+    int uiScalePercent = 100;
+    bool translucent = false;
 };
 
 enum class HotElement {
@@ -54,6 +59,7 @@ enum class HotElement {
     Pin,
     Close,
     Settings,
+    Transparency,
     Save,
 };
 
@@ -81,8 +87,17 @@ struct AppState {
 
 AppState g;
 
-int Scale(int value) {
+int ScaleForDpi(int value) {
     return MulDiv(value, static_cast<int>(g.dpi), 96);
+}
+
+int Scale(int value) {
+    return MulDiv(ScaleForDpi(value), g.settings.uiScalePercent, 100);
+}
+
+int Unscale(int value) {
+    const int dpiValue = MulDiv(value, 100, g.settings.uiScalePercent);
+    return MulDiv(dpiValue, 96, static_cast<int>(g.dpi));
 }
 
 RECT ScaledRect(int left, int top, int right, int bottom) {
@@ -147,6 +162,18 @@ void FillRounded(HDC dc, const RECT& rect, int radius, COLORREF color) {
     DeleteObject(brush);
 }
 
+void FillEllipse(HDC dc, const RECT& rect, COLORREF color) {
+    HBRUSH brush = CreateSolidBrush(color);
+    HPEN pen = CreatePen(PS_NULL, 0, color);
+    const auto oldBrush = SelectObject(dc, brush);
+    const auto oldPen = SelectObject(dc, pen);
+    Ellipse(dc, rect.left, rect.top, rect.right, rect.bottom);
+    SelectObject(dc, oldPen);
+    SelectObject(dc, oldBrush);
+    DeleteObject(pen);
+    DeleteObject(brush);
+}
+
 void DrawTextInRect(
     HDC dc,
     const std::wstring& text,
@@ -191,6 +218,13 @@ Settings LoadSettings() {
         L"work", L"startMinutes", settings.startMinutes, g.settingsPath.c_str());
     settings.endMinutes = GetPrivateProfileIntW(
         L"work", L"endMinutes", settings.endMinutes, g.settingsPath.c_str());
+    settings.uiScalePercent = std::clamp(
+        GetPrivateProfileIntW(
+            L"window", L"scalePercent", settings.uiScalePercent, g.settingsPath.c_str()),
+        kMinScalePercent, kMaxScalePercent);
+    settings.translucent = GetPrivateProfileIntW(
+        L"window", L"translucent", settings.translucent ? 1 : 0,
+        g.settingsPath.c_str()) != 0;
 
     wchar_t salary[64] = {};
     GetPrivateProfileStringW(
@@ -219,6 +253,11 @@ void SaveSettings() {
     WritePrivateProfileStringW(L"work", L"endMinutes", value, g.settingsPath.c_str());
     swprintf_s(value, L"%.2f", g.settings.dailySalary);
     WritePrivateProfileStringW(L"work", L"dailySalary", value, g.settingsPath.c_str());
+    swprintf_s(value, L"%d", g.settings.uiScalePercent);
+    WritePrivateProfileStringW(L"window", L"scalePercent", value, g.settingsPath.c_str());
+    WritePrivateProfileStringW(
+        L"window", L"translucent", g.settings.translucent ? L"1" : L"0",
+        g.settingsPath.c_str());
 }
 
 std::wstring FormatTime(int minutes) {
@@ -313,6 +352,7 @@ bool ParseTimeText(const wchar_t* text, int& minutes) {
 }
 
 bool ReadEditorSettings(Settings& settings) {
+    settings = g.settings;
     wchar_t start[32] = {};
     wchar_t end[32] = {};
     wchar_t salary[64] = {};
@@ -352,6 +392,11 @@ void TogglePinned() {
     InvalidateRect(g.window, nullptr, FALSE);
 }
 
+void ApplyTransparency() {
+    SetLayeredWindowAttributes(
+        g.window, 0, g.settings.translucent ? kTranslucentAlpha : 255, LWA_ALPHA);
+}
+
 RECT PinRect() {
     return ScaledRect(272, 12, 304, 44);
 }
@@ -364,8 +409,12 @@ RECT SettingsRect() {
     return ScaledRect(20, 258, 340, 304);
 }
 
+RECT TransparencyRect() {
+    return ScaledRect(268, 530, 323, 558);
+}
+
 RECT SaveRect() {
-    return ScaledRect(37, 536, 323, 576);
+    return ScaledRect(37, 584, 323, 624);
 }
 
 HotElement HitElement(POINT point) {
@@ -378,6 +427,9 @@ HotElement HitElement(POINT point) {
     if (Contains(SettingsRect(), point)) {
         return HotElement::Settings;
     }
+    if (g.expanded && Contains(TransparencyRect(), point)) {
+        return HotElement::Transparency;
+    }
     if (g.expanded && Contains(SaveRect(), point)) {
         return HotElement::Save;
     }
@@ -385,8 +437,8 @@ HotElement HitElement(POINT point) {
 }
 
 void DrawPin(HDC dc, const RECT& rect) {
-    const int left = MulDiv(rect.left, 96, static_cast<int>(g.dpi));
-    const int top = MulDiv(rect.top, 96, static_cast<int>(g.dpi));
+    const int left = Unscale(rect.left);
+    const int top = Unscale(rect.top);
     const COLORREF color = g.pinned ? RGB(6, 28, 43) : kTextPrimary;
     DrawLine(dc, left + 11, top + 9, left + 21, top + 9, color, 2);
     DrawLine(dc, left + 13, top + 9, left + 13, top + 16, color, 1);
@@ -396,8 +448,8 @@ void DrawPin(HDC dc, const RECT& rect) {
 }
 
 void DrawClose(HDC dc, const RECT& rect) {
-    const int left = MulDiv(rect.left, 96, static_cast<int>(g.dpi));
-    const int top = MulDiv(rect.top, 96, static_cast<int>(g.dpi));
+    const int left = Unscale(rect.left);
+    const int top = Unscale(rect.top);
     DrawLine(dc, left + 11, top + 11, left + 21, top + 21, kTextPrimary, 1);
     DrawLine(dc, left + 21, top + 11, left + 11, top + 21, kTextPrimary, 1);
 }
@@ -412,6 +464,27 @@ void DrawChevron(HDC dc, bool expanded) {
         DrawLine(dc, centerX - 4, centerY - 2, centerX, centerY + 2, kTextSecondary, 1);
         DrawLine(dc, centerX, centerY + 2, centerX + 4, centerY - 2, kTextSecondary, 1);
     }
+}
+
+void DrawTransparencyToggle(HDC dc) {
+    const RECT track = TransparencyRect();
+    FillRounded(
+        dc, track, 14,
+        g.settings.translucent
+            ? (g.hot == HotElement::Transparency ? kAccentHover : kAccent)
+            : (g.hot == HotElement::Transparency ? kButtonHover : kButtonBackground));
+    const RECT thumb = g.settings.translucent
+        ? ScaledRect(297, 534, 319, 556)
+        : ScaledRect(272, 534, 294, 556);
+    FillEllipse(
+        dc, thumb,
+        g.settings.translucent ? RGB(4, 34, 51) : kTextSecondary);
+}
+
+void DrawResizeGrip(HDC dc) {
+    const int bottom = g.expanded ? kExpandedHeight : kCollapsedHeight;
+    DrawLine(dc, 346, bottom - 7, 353, bottom - 14, kTextMuted, 1);
+    DrawLine(dc, 340, bottom - 7, 353, bottom - 20, kTextMuted, 1);
 }
 
 void PaintWindow(HDC target, const RECT& client) {
@@ -500,7 +573,7 @@ void PaintWindow(HDC target, const RECT& client) {
     DrawChevron(dc, g.expanded);
 
     if (g.expanded) {
-        FillRounded(dc, ScaledRect(20, 306, 340, 618), 6, kPanelBackground);
+        FillRounded(dc, ScaledRect(20, 306, 340, 672), 6, kPanelBackground);
         DrawTextInRect(dc, L"上班时间", ScaledRect(37, 315, 220, 339), g.labelFont, kTextPrimary);
         DrawTextInRect(dc, L"下班时间", ScaledRect(37, 382, 220, 406), g.labelFont, kTextPrimary);
         DrawTextInRect(dc, L"日薪（元）", ScaledRect(37, 449, 220, 473), g.labelFont, kTextPrimary);
@@ -508,6 +581,11 @@ void PaintWindow(HDC target, const RECT& client) {
         FillRounded(dc, ScaledRect(37, 344, 323, 380), 5, kInputBackground);
         FillRounded(dc, ScaledRect(37, 411, 323, 447), 5, kInputBackground);
         FillRounded(dc, ScaledRect(37, 478, 323, 514), 5, kInputBackground);
+
+        DrawTextInRect(
+            dc, L"半透明（85%）", ScaledRect(37, 530, 250, 558),
+            g.labelFont, kTextPrimary);
+        DrawTransparencyToggle(dc);
 
         const COLORREF saveColor = g.hot == HotElement::Save ? kAccentHover : kAccent;
         FillRounded(dc, SaveRect(), 6, saveColor);
@@ -517,14 +595,16 @@ void PaintWindow(HDC target, const RECT& client) {
 
         if (g.validationError) {
             DrawTextInRect(
-                dc, L"请输入 HH:MM 时间和有效日薪", ScaledRect(37, 580, 323, 601),
+                dc, L"请输入 HH:MM 时间和有效日薪", ScaledRect(37, 636, 323, 657),
                 g.tinyFont, kDanger, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
         } else {
             DrawTextInRect(
-                dc, L"设置只保存在这台电脑上", ScaledRect(37, 580, 323, 601),
+                dc, L"设置和窗口大小保存在本机", ScaledRect(37, 636, 323, 657),
                 g.tinyFont, kTextMuted, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
         }
     }
+
+    DrawResizeGrip(dc);
 
     BitBlt(target, 0, 0, client.right, client.bottom, dc, 0, 0, SRCCOPY);
     SelectObject(dc, oldBitmap);
@@ -563,6 +643,76 @@ void ApplyWindowAppearance(HWND window) {
     DwmSetWindowAttribute(window, 33, &roundedPreference, sizeof(roundedPreference));
 }
 
+void SetUiScale(int percent) {
+    percent = std::clamp(percent, kMinScalePercent, kMaxScalePercent);
+    if (g.settings.uiScalePercent == percent) {
+        return;
+    }
+    g.settings.uiScalePercent = percent;
+    CreateFonts();
+    ArrangeEditors();
+    if (g.window != nullptr) {
+        InvalidateRect(g.window, nullptr, FALSE);
+    }
+}
+
+void ConstrainSizingRect(RECT& rect, WPARAM edge) {
+    const int baseWidth = ScaleForDpi(kWindowWidth);
+    const int baseHeight = ScaleForDpi(g.expanded ? kExpandedHeight : kCollapsedHeight);
+    const int widthPercent = MulDiv(rect.right - rect.left, 100, baseWidth);
+    const int heightPercent = MulDiv(rect.bottom - rect.top, 100, baseHeight);
+
+    int percent = widthPercent;
+    if (edge == WMSZ_TOP || edge == WMSZ_BOTTOM) {
+        percent = heightPercent;
+    } else if (edge == WMSZ_TOPLEFT || edge == WMSZ_TOPRIGHT ||
+               edge == WMSZ_BOTTOMLEFT || edge == WMSZ_BOTTOMRIGHT) {
+        const int widthDelta = std::abs(widthPercent - g.settings.uiScalePercent);
+        const int heightDelta = std::abs(heightPercent - g.settings.uiScalePercent);
+        percent = heightDelta > widthDelta ? heightPercent : widthPercent;
+    }
+    percent = std::clamp(percent, kMinScalePercent, kMaxScalePercent);
+
+    const int width = MulDiv(baseWidth, percent, 100);
+    const int height = MulDiv(baseHeight, percent, 100);
+    const bool resizeFromLeft = edge == WMSZ_LEFT || edge == WMSZ_TOPLEFT ||
+        edge == WMSZ_BOTTOMLEFT;
+    const bool resizeFromTop = edge == WMSZ_TOP || edge == WMSZ_TOPLEFT ||
+        edge == WMSZ_TOPRIGHT;
+
+    if (resizeFromLeft) {
+        rect.left = rect.right - width;
+    } else {
+        rect.right = rect.left + width;
+    }
+    if (resizeFromTop) {
+        rect.top = rect.bottom - height;
+    } else {
+        rect.bottom = rect.top + height;
+    }
+    SetUiScale(percent);
+}
+
+LRESULT ResizeHitTest(HWND window, POINT point) {
+    RECT client = {};
+    GetClientRect(window, &client);
+    const int border = std::max(4, Scale(6));
+    const bool left = point.x < border;
+    const bool right = point.x >= client.right - border;
+    const bool top = point.y < border;
+    const bool bottom = point.y >= client.bottom - border;
+
+    if (top && left) return HTTOPLEFT;
+    if (top && right) return HTTOPRIGHT;
+    if (bottom && left) return HTBOTTOMLEFT;
+    if (bottom && right) return HTBOTTOMRIGHT;
+    if (left) return HTLEFT;
+    if (right) return HTRIGHT;
+    if (top) return HTTOP;
+    if (bottom) return HTBOTTOM;
+    return HTCLIENT;
+}
+
 LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lParam) {
     switch (message) {
         case WM_CREATE: {
@@ -572,11 +722,11 @@ LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
                 GetModuleHandleW(nullptr), MAKEINTRESOURCEW(IDI_OFFWORK), IMAGE_ICON,
                 Scale(32), Scale(32), LR_DEFAULTCOLOR));
             g.editBrush = CreateSolidBrush(kInputBackground);
-            g.settings = LoadSettings();
             CreateEditors(window, reinterpret_cast<LPCREATESTRUCTW>(lParam)->hInstance);
             CreateFonts();
             PopulateEditors();
             ApplyWindowAppearance(window);
+            ApplyTransparency();
             SetTimer(window, kClockTimer, 1000, nullptr);
             return 0;
         }
@@ -596,9 +746,18 @@ LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
         }
         case WM_ERASEBKGND:
             return 1;
+        case WM_NCCALCSIZE:
+            if (wParam != 0) {
+                return 0;
+            }
+            break;
         case WM_NCHITTEST: {
             POINT point = {GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
             ScreenToClient(window, &point);
+            const LRESULT resizeHit = ResizeHitTest(window, point);
+            if (resizeHit != HTCLIENT) {
+                return resizeHit;
+            }
             if (point.y < Scale(56) && HitElement(point) == HotElement::None) {
                 return HTCAPTION;
             }
@@ -630,6 +789,12 @@ LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
                     break;
                 case HotElement::Settings:
                     SetExpanded(!g.expanded);
+                    break;
+                case HotElement::Transparency:
+                    g.settings.translucent = !g.settings.translucent;
+                    ApplyTransparency();
+                    SaveSettings();
+                    InvalidateRect(window, nullptr, FALSE);
                     break;
                 case HotElement::Save: {
                     Settings settings;
@@ -664,6 +829,20 @@ LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
         case WM_ACTIVATE:
             EnsureTopmost();
             return 0;
+        case WM_SIZING:
+            ConstrainSizingRect(*reinterpret_cast<RECT*>(lParam), wParam);
+            return TRUE;
+        case WM_SIZE:
+            if (wParam != SIZE_MINIMIZED) {
+                const int baseWidth = ScaleForDpi(kWindowWidth);
+                if (baseWidth > 0) {
+                    SetUiScale(MulDiv(LOWORD(lParam), 100, baseWidth));
+                }
+            }
+            return 0;
+        case WM_EXITSIZEMOVE:
+            SaveSettings();
+            return 0;
         case WM_DPICHANGED: {
             g.dpi = HIWORD(wParam);
             CreateFonts();
@@ -678,8 +857,13 @@ LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
         }
         case WM_GETMINMAXINFO: {
             auto info = reinterpret_cast<MINMAXINFO*>(lParam);
-            info->ptMinTrackSize = {Scale(kWindowWidth), Scale(kCollapsedHeight)};
-            info->ptMaxTrackSize = {Scale(kWindowWidth), Scale(kExpandedHeight)};
+            const int logicalHeight = g.expanded ? kExpandedHeight : kCollapsedHeight;
+            info->ptMinTrackSize = {
+                MulDiv(ScaleForDpi(kWindowWidth), kMinScalePercent, 100),
+                MulDiv(ScaleForDpi(logicalHeight), kMinScalePercent, 100)};
+            info->ptMaxTrackSize = {
+                MulDiv(ScaleForDpi(kWindowWidth), kMaxScalePercent, 100),
+                MulDiv(ScaleForDpi(logicalHeight), kMaxScalePercent, 100)};
             return 0;
         }
         case WM_CLOSE:
@@ -706,6 +890,7 @@ LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
         default:
             return DefWindowProcW(window, message, wParam, lParam);
     }
+    return DefWindowProcW(window, message, wParam, lParam);
 }
 
 }  // namespace
@@ -749,6 +934,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int showCommand) {
     }
 
     g.dpi = GetDpiForSystem();
+    g.settings = LoadSettings();
     RECT workArea = {};
     SystemParametersInfoW(SPI_GETWORKAREA, 0, &workArea, 0);
     const int width = Scale(kWindowWidth);
@@ -756,10 +942,10 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int showCommand) {
     const int margin = Scale(20);
 
     HWND window = CreateWindowExW(
-        WS_EX_TOPMOST | WS_EX_TOOLWINDOW,
+        WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_LAYERED,
         kWindowClass,
         kWindowTitle,
-        WS_POPUP | WS_CLIPCHILDREN,
+        WS_POPUP | WS_THICKFRAME | WS_CLIPCHILDREN,
         workArea.right - width - margin,
         workArea.top + margin,
         width,
