@@ -65,6 +65,8 @@ if(WIN32)
   add_executable(OffWork WIN32
     src/main.cpp
     src/app.cpp
+    src/app_edit.cpp
+    src/app_view.cpp
     src/autostart.cpp
     src/layered_surface.cpp
     src/render.cpp
