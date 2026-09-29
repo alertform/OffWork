@@ -45,9 +45,12 @@ UninstallDisplayName={#AppName} {#AppVersion}
 Compression=lzma2/max
 SolidCompression=yes
 WizardStyle=modern
-; Offer to close a running copy instead of failing on a locked file. Matches the
-; single-instance mutex in src/main.cpp.
-AppMutex=Local\OffWork.Native.SingleInstance
+; No AppMutex: since 0.3.0 the title-bar close button hides OffWork to the tray,
+; so "please close all instances" became a prompt the user cannot satisfy by
+; closing the window -- with the widget hidden there is nothing on screen to
+; close, and OK just re-prompts. Instead [Code] below asks the running app to
+; exit (both at install and at uninstall), and Restart Manager stays on as a
+; safety net for anything else holding the files.
 CloseApplications=yes
 RestartApplications=no
 
@@ -97,6 +100,19 @@ ConfirmUninstall=确定要完全卸载 OffWork 及其组件吗?
 UninstallStatusLabel=正在从您的电脑移除 OffWork, 请稍候。
 StatusExtractFiles=正在解压文件...
 StatusUninstalling=正在卸载 OffWork...
+WizardPreparing=准备安装
+PreparingDesc=安装程序正在准备把 OffWork 安装到您的电脑。
+ApplicationsFound=下列程序正在使用需要更新的文件。建议让安装程序自动关闭它们。
+ApplicationsFound2=下列程序正在使用需要更新的文件。建议让安装程序自动关闭它们, 安装完成后会尝试重新启动。
+CloseApplications=自动关闭这些程序(&A)
+DontCloseApplications=不关闭(&D)
+ErrorCloseApplications=安装程序无法自动关闭所有程序。建议先关闭正在使用待更新文件的程序再继续。
+SetupAppRunningError=安装程序检测到 %1 正在运行。%n%n请先退出它 (托盘图标右键 → 退出), 然后点「确定」继续, 或点「取消」退出安装。
+UninstallAppRunningError=卸载程序检测到 %1 正在运行。%n%n请先退出它 (托盘图标右键 → 退出), 然后点「确定」继续, 或点「取消」退出卸载。
+UninstalledMost=%1 已卸载。%n%n有些文件未能删除, 可以手动删除。
+UninstalledAll=%1 已从您的电脑移除。
+UninstallAppTitle=卸载
+UninstallAppFullTitle=卸载 %1
 
 [CustomMessages]
 default.CreateDesktopIcon=创建桌面快捷方式
@@ -129,3 +145,63 @@ Root: HKCU; Subkey: "{#RunKey}"; ValueType: none; ValueName: "{#RunValueName}"; 
 [Run]
 Filename: "{app}\{#AppExeName}"; Description: "{cm:LaunchAfterInstall}"; \
     Flags: nowait postinstall skipifsilent
+
+[Code]
+// Ask a running OffWork to exit before its files are replaced or removed.
+//
+// WM_ENDSESSION(TRUE) is the exit path 0.3.0+ implements for exactly this (its
+// WM_CLOSE only hides to the tray). WM_CLOSE is still sent for 0.2.0, which
+// exits on it and ignores WM_ENDSESSION. Both go to OffWork's own window only.
+const
+  WM_CLOSE = $0010;
+  WM_ENDSESSION = $0016;
+  OffWorkWindowClass = 'OffWork.Native.Widget';
+
+function CloseRunningOffWork(): Boolean;
+var
+  Wnd: HWND;
+  Waited: Integer;
+begin
+  Wnd := FindWindowByClassName(OffWorkWindowClass);
+  if Wnd = 0 then
+  begin
+    Result := True;
+    Exit;
+  end;
+  Log('OffWork is running; asking it to exit.');
+  PostMessage(Wnd, WM_ENDSESSION, 1, 0);
+  PostMessage(Wnd, WM_CLOSE, 0, 0);
+  Waited := 0;
+  while (FindWindowByClassName(OffWorkWindowClass) <> 0) and (Waited < 8000) do
+  begin
+    Sleep(200);
+    Waited := Waited + 200;
+  end;
+  // The window disappears slightly before the process lets go of its image.
+  Sleep(500);
+  Result := FindWindowByClassName(OffWorkWindowClass) = 0;
+  if Result then
+    Log('OffWork exited.')
+  else
+    Log('OffWork did not exit within 8 seconds.');
+end;
+
+function PrepareToInstall(var NeedsRestart: Boolean): String;
+begin
+  Result := '';
+  if not CloseRunningOffWork() then
+    Result := 'OffWork 仍在运行, 无法更新。请在托盘图标上右键选择「退出」, 然后重新运行安装程序。';
+end;
+
+// usAppMutexCheck runs after the user has confirmed the uninstall (so cancelling
+// never closes OffWork as a side effect) and before Inno's own running-app
+// check. That check still fires on machines first installed by 0.2.0: the
+// uninstall log keeps the AppMutex that installer recorded, even after later
+// upgrades by an installer that no longer sets one.
+procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
+begin
+  if CurUninstallStep = usAppMutexCheck then
+    if not CloseRunningOffWork() then
+      MsgBox('OffWork 仍在运行, 程序文件可能无法删除。卸载完成后请在托盘图标上右键选择「退出」, 再手动删除安装目录。',
+        mbError, MB_OK);
+end;
